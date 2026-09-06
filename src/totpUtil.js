@@ -30,10 +30,10 @@ export function validateSecret(secret) {
   return base32Regex.test(secret);
 }
 
-export function generateToken(secret) {
+export function generateToken(secret, timestamp) {
   if (secret !== null && secret !== undefined && secret !== "") {
     try {
-      const token = totp(secret);
+      const token = timestamp ? totp(secret, {timestamp}) : totp(secret);
       const tokenWithSpace = token.slice(0, 3) + " " + token.slice(3);
       return tokenWithSpace;
     } catch (error) {
@@ -44,8 +44,13 @@ export function generateToken(secret) {
   }
 }
 
+export function generateNextToken(secret, period = 30) {
+  return generateToken(secret, Date.now() + period * 1000);
+}
+
 export function useTokenRefresh(secretKey, period = 30) {
   const [token, setToken] = useState(() => generateToken(secretKey));
+  const [nextToken, setNextToken] = useState(() => generateNextToken(secretKey, period));
   const [timeRemaining, setTimeRemaining] = useState(() => calculateCountdown());
 
   useEffect(() => {
@@ -55,6 +60,7 @@ export function useTokenRefresh(secretKey, period = 30) {
 
     const updateToken = () => {
       setToken(generateToken(secretKey));
+      setNextToken(generateNextToken(secretKey, period));
       setTimeRemaining(calculateCountdown(period));
     };
 
@@ -102,5 +108,5 @@ export function useTokenRefresh(secretKey, period = 30) {
     };
   }, [secretKey, period]);
 
-  return {token, timeRemaining};
+  return {token, nextToken, timeRemaining};
 }

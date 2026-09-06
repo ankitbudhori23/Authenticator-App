@@ -47,7 +47,11 @@
     "Error scanning QR code": "Error scanning QR code",
     "Scan QR Code": "Scan QR Code",
     "Enter Secret Code": "Enter Secret Code",
-    "Import from other app": "Import from other app"
+    "Import from other app": "Import from other app",
+    "Add account": "Add account",
+    "Next": "Next",
+    "Delete account": "Delete account",
+    "Are you sure you want to delete this account?": "Are you sure you want to delete this account?"
   },
   "importManager": {
     "Select app to import from": "Select app to import from",
@@ -72,7 +76,10 @@
   "qrScanner": {
     "Requesting permissions": "Requesting permissions",
     "No access to camera or media library": "No access to camera or media library",
-    "Choose Image": "Choose Image"
+    "Choose Image": "Choose Image",
+    "Camera permission required": "Camera permission required",
+    "To scan QR codes, enable camera access in Settings.": "To scan QR codes, enable camera access in Settings.",
+    "Open Settings": "Open Settings"
   },
   "scanLogin": {
     "Invalid QR code format": "Invalid QR code format",
@@ -87,9 +94,15 @@
     "Sign In": "Sign In",
     "Preferences": "Preferences",
     "Language": "Language",
+    "Appearance": "Appearance",
+    "System": "System",
+    "Light": "Light",
+    "Dark": "Dark",
     "About": "About",
     "Version": "Version",
-    "Commit Hash": "Commit Hash"
+    "Commit Hash": "Commit Hash",
+    "Exit": "Exit",
+    "Are you sure you want to exit?": "Are you sure you want to exit?"
   },
   "syncLogic": {
     "Sync failed": "Sync failed",

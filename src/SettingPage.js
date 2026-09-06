@@ -13,134 +13,138 @@
 // limitations under the License.
 
 import React, {useState} from "react";
-import {Dimensions, ScrollView, StyleSheet, TouchableOpacity, View} from "react-native";
-import {Avatar, Button, IconButton, List, Surface, Text, useTheme} from "react-native-paper";
-import {ActionSheetProvider} from "@expo/react-native-action-sheet";
+import {ScrollView, StyleSheet, View} from "react-native";
+import {Avatar, Button, Dialog, Divider, List, Portal, SegmentedButtons, Text, useTheme} from "react-native-paper";
 import * as Application from "expo-application";
 import {useTranslation} from "react-i18next";
 import Constants, {ExecutionEnvironment} from "expo-constants";
 import {SvgUri} from "react-native-svg";
 
 import CasdoorLoginPage, {useCasdoorLogout} from "./CasdoorLoginPage";
-import LoginMethodSelector from "./LoginMethodSelector";
+import LoginMethodSheet from "./LoginMethodSelector";
 import useStore from "./useStorage";
+import useThemeStore from "./useThemeStore";
 import {Language} from "./Language";
-
-const {width} = Dimensions.get("window");
 
 const SettingPage = () => {
   const [showLoginPage, setShowLoginPage] = useState(false);
   const [loginMethod, setLoginMethod] = useState(null);
+  const [loginSheetVisible, setLoginSheetVisible] = useState(false);
+  const [exitDialogVisible, setExitDialogVisible] = useState(false);
   const {userInfo, clearAll} = useStore();
+  const {themePreference, setThemePreference} = useThemeStore();
   const theme = useTheme();
   const {t} = useTranslation();
   const logout = useCasdoorLogout();
-  const {openActionSheet} = LoginMethodSelector({
-    onSelectMethod: (method) => {
-      setLoginMethod(method);
-      setShowLoginPage(true);
-    },
-  });
 
-  const handleCasdoorLogin = () => {
-    openActionSheet();
-  };
+  const handleCasdoorLogin = () => setLoginSheetVisible(true);
 
   const handleHideLoginPage = () => {
     setShowLoginPage(false);
     setLoginMethod(null);
   };
 
-  const handleCasdoorLogout = () => {
+  const confirmExit = () => {
+    setExitDialogVisible(false);
     logout();
     clearAll();
   };
 
+  const versionLabel =
+    Constants.executionEnvironment === ExecutionEnvironment.Standalone
+      ? Application.nativeApplicationVersion
+      : Constants.expoConfig?.version;
+
   return (
-    <ActionSheetProvider>
-      <ScrollView style={styles.scrollView}>
-        <Surface style={styles.container} elevation={0}>
-          <Surface style={styles.profileCard} elevation={1}>
-            {userInfo ? (
-              <View style={styles.profileInfo}>
-                {userInfo.avatar?.endsWith(".svg") ? (
-                  <View style={{width: 60, height: 60}}>
-                    <SvgUri
-                      width="60"
-                      height="60"
-                      uri={userInfo.avatar}
-                    />
-                  </View>
-                ) : (
-                  <Avatar.Image
-                    size={60}
-                    source={{uri: userInfo.avatar}}
-                  />
-                )}
-                <View style={styles.profileText}>
-                  <Text variant="titleLarge">{userInfo.name}</Text>
-                  <Text variant="bodyMedium" style={{color: theme.colors.secondary}}>
-                    {userInfo.email}
-                  </Text>
+    <View style={{flex: 1, backgroundColor: theme.colors.background}}>
+      <ScrollView style={[styles.scrollView, {backgroundColor: theme.colors.background}]}>
+        <View style={styles.profile}>
+          {userInfo ? (
+            <>
+              {userInfo.avatar?.endsWith(".svg") ? (
+                <View style={styles.avatar}>
+                  <SvgUri width="72" height="72" uri={userInfo.avatar} />
                 </View>
-                <IconButton
-                  icon="logout"
-                  mode="contained-tonal"
-                  onPress={handleCasdoorLogout}
-                  style={styles.logoutButton}
-                />
-              </View>
-            ) : (
-              <TouchableOpacity
-                style={styles.profileCard}
+              ) : (
+                <Avatar.Image size={72} source={{uri: userInfo.avatar}} />
+              )}
+              <Text variant="titleLarge" style={styles.name}>{userInfo.name}</Text>
+              <Text variant="bodyMedium" style={{color: theme.colors.onSurfaceVariant}}>
+                {userInfo.email}
+              </Text>
+            </>
+          ) : (
+            <>
+              <Avatar.Icon size={72} icon="account" style={{backgroundColor: theme.colors.surfaceVariant}} color={theme.colors.onSurfaceVariant} />
+              <Button
+                mode="contained"
+                icon="login"
                 onPress={handleCasdoorLogin}
+                style={styles.actionButton}
               >
-                <Button
-                  icon="login"
-                  style={styles.loginButton}
-                  labelStyle={styles.loginButtonLabel}
-                >
-                  {t("settings.Sign In")}
-                </Button>
-              </TouchableOpacity>
-            )}
-          </Surface>
+                {t("settings.Sign In")}
+              </Button>
+            </>
+          )}
+        </View>
 
-          {/* Settings Sections */}
-          <List.Section>
-            <List.Subheader>{t("settings.Preferences")}</List.Subheader>
+        <Divider />
 
-            <List.Item
-              title={t("settings.Language")}
-              left={props => <List.Icon {...props} icon="translate" />}
-              right={() => <Language />}
-            />
+        <View style={styles.themeSection}>
+          <View style={styles.themeHeader}>
+            <List.Icon icon="theme-light-dark" color={theme.colors.onSurfaceVariant} />
+            <Text variant="titleMedium" style={styles.themeTitle}>{t("settings.Appearance")}</Text>
+          </View>
+          <SegmentedButtons
+            value={themePreference}
+            onValueChange={setThemePreference}
+            buttons={[
+              {value: "system", label: t("settings.System"), icon: "cellphone"},
+              {value: "light", label: t("settings.Light"), icon: "white-balance-sunny"},
+              {value: "dark", label: t("settings.Dark"), icon: "weather-night"},
+            ]}
+            style={styles.themeSegments}
+          />
+        </View>
 
-          </List.Section>
+        <Divider />
 
-          <List.Section>
-            <List.Subheader>{t("settings.About")}</List.Subheader>
+        <List.Item
+          title={t("settings.Language")}
+          left={props => <List.Icon {...props} icon="translate" />}
+          right={() => <Language />}
+        />
 
-            <List.Item
-              title={t("settings.Version")}
-              description={
-                Constants.executionEnvironment === ExecutionEnvironment.Standalone
-                  ? Application.nativeApplicationVersion
-                  : Constants.expoConfig?.version
-              }
-              left={props => <List.Icon {...props} icon="information" />}
-            />
+        <Divider />
 
-            {process.env.EXPO_PUBLIC_COMMIT_HASH && (
-              <List.Item
-                title={t("settings.Commit Hash")}
-                description={process.env.EXPO_PUBLIC_COMMIT_HASH.slice(0, 7)}
-                left={props => <List.Icon {...props} icon="git" />}
-              />
-            )}
+        <List.Item
+          title={t("settings.Version")}
+          description={versionLabel}
+          left={props => <List.Icon {...props} icon="information-outline" />}
+        />
 
-          </List.Section>
-        </Surface>
+        {process.env.EXPO_PUBLIC_COMMIT_HASH && (
+          <List.Item
+            title={t("settings.Commit Hash")}
+            description={process.env.EXPO_PUBLIC_COMMIT_HASH.slice(0, 7)}
+            left={props => <List.Icon {...props} icon="git" />}
+          />
+        )}
+
+        {userInfo && (
+          <View style={styles.exitSection}>
+            <Button
+              mode="contained"
+              icon="logout"
+              onPress={() => setExitDialogVisible(true)}
+              style={styles.exitButton}
+              buttonColor={theme.colors.error}
+              textColor={theme.colors.onError}
+            >
+              {t("settings.Exit")}
+            </Button>
+          </View>
+        )}
 
         {showLoginPage && (
           <CasdoorLoginPage
@@ -149,44 +153,88 @@ const SettingPage = () => {
           />
         )}
       </ScrollView>
-    </ActionSheetProvider>
+
+      <LoginMethodSheet
+        visible={loginSheetVisible}
+        onDismiss={() => setLoginSheetVisible(false)}
+        onSelectMethod={(method) => {
+          setLoginMethod(method);
+          setShowLoginPage(true);
+        }}
+      />
+
+      <Portal>
+        <Dialog
+          visible={exitDialogVisible}
+          onDismiss={() => setExitDialogVisible(false)}
+          style={{backgroundColor: theme.colors.surface, borderRadius: 20}}
+        >
+          <Dialog.Title style={{color: theme.colors.onSurface}}>
+            {t("settings.Exit")}
+          </Dialog.Title>
+          <Dialog.Content>
+            <Text style={{color: theme.colors.onSurfaceVariant}}>
+              {t("settings.Are you sure you want to exit?")}
+            </Text>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setExitDialogVisible(false)} textColor={theme.colors.onSurfaceVariant}>
+              {t("common.cancel")}
+            </Button>
+            <Button onPress={confirmExit} textColor={theme.colors.error}>
+              {t("settings.Exit")}
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
-    backgroundColor: "#F2F2F2",
   },
-  container: {
-    flex: 1,
-    padding: 16,
-    width: width > 600 ? 600 : "100%",
-    alignSelf: "center",
-    backgroundColor: "#F2F2F2",
+  profile: {
+    alignItems: "center",
+    paddingVertical: 32,
+    paddingHorizontal: 20,
   },
-  profileCard: {
-    padding: 10,
-    borderRadius: 14,
+  name: {
+    marginTop: 12,
+    fontWeight: "600",
   },
-  profileInfo: {
+  actionButton: {
+    marginTop: 20,
+    minWidth: 160,
+  },
+  avatar: {
+    width: 72,
+    height: 72,
+  },
+  themeSection: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  themeHeader: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 8,
+    marginBottom: 8,
   },
-  profileText: {
-    flex: 1,
-    marginLeft: 16,
+  themeTitle: {
+    marginLeft: 4,
   },
-  loginButton: {
-    borderRadius: 8,
-    alignSelf: "center",
+  themeSegments: {
+    marginTop: 4,
   },
-  loginButtonLabel: {
-    fontSize: 18,
+  exitSection: {
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 32,
   },
-  logoutButton: {
-    marginLeft: 8,
+  exitButton: {
+    borderRadius: 22,
+    paddingVertical: 4,
   },
 });
 

@@ -12,116 +12,107 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import React, {useState} from "react";
-import {StyleSheet, Text, TextInput, View} from "react-native";
-import {Button, IconButton} from "react-native-paper";
+import React, {useEffect, useState} from "react";
+import {StyleSheet, View} from "react-native";
+import {Button, IconButton, Text, TextInput, useTheme} from "react-native-paper";
 import PropTypes from "prop-types";
 import {useTranslation} from "react-i18next";
 
-export default function EnterAccountDetails({onClose, onEdit, placeholder}) {
-  EnterAccountDetails.propTypes = {
-    onClose: PropTypes.func.isRequired,
-    onEdit: PropTypes.func.isRequired,
-    placeholder: PropTypes.string.isRequired,
-  };
-
+export default function EditAccountDetails({onClose, onEdit, placeholder}) {
   const {t} = useTranslation();
+  const theme = useTheme();
   const [accountName, setAccountName] = useState(placeholder);
 
+  useEffect(() => {
+    setAccountName(placeholder);
+  }, [placeholder]);
+
   const handleConfirm = () => {
+    if (accountName.trim() === "") {
+      return;
+    }
     onEdit(accountName);
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.content}>
-        <View style={styles.header}>
-          <Text style={styles.title}>{t("editAccount.Enter new account name")}</Text>
-          <IconButton
-            icon="close"
-            size={24}
-            onPress={onClose}
-            style={styles.closeButton}
-          />
-        </View>
-        <TextInput
-          label={t("editAccount.Account Name")}
-          placeholder={placeholder}
-          value={accountName}
-          onChangeText={(text) => setAccountName(text)}
-          style={styles.input}
-          mode="outlined"
-          autoCapitalize="none"
+    <View style={[styles.container, {backgroundColor: theme.colors.surface}]}>
+      <View style={styles.header}>
+        <Text style={[styles.title, {color: theme.colors.onSurface}]}>
+          {t("editAccount.Enter new account name")}
+        </Text>
+        <IconButton
+          icon="close"
+          size={22}
+          onPress={onClose}
+          iconColor={theme.colors.onSurfaceVariant}
+          style={styles.closeButton}
         />
-        <View style={styles.buttonContainer}>
-          <Button
-            mode="contained"
-            onPress={handleConfirm}
-            style={styles.addButton}
-            labelStyle={styles.buttonLabel}
-          >
-            {t("common.confirm")}
-          </Button>
-        </View>
       </View>
+
+      <TextInput
+        label={t("editAccount.Account Name")}
+        placeholder={placeholder}
+        value={accountName}
+        onChangeText={setAccountName}
+        mode="outlined"
+        style={styles.input}
+        outlineStyle={styles.inputOutline}
+        autoCapitalize="none"
+        autoFocus
+      />
+
+      <Button
+        mode="contained"
+        onPress={handleConfirm}
+        style={styles.saveButton}
+        contentStyle={styles.saveButtonContent}
+        labelStyle={styles.saveButtonLabel}
+      >
+        {t("common.save")}
+      </Button>
     </View>
   );
 }
 
+EditAccountDetails.propTypes = {
+  onClose: PropTypes.func.isRequired,
+  onEdit: PropTypes.func.isRequired,
+  placeholder: PropTypes.string.isRequired,
+};
+
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    borderRadius: 10,
-  },
-  content: {
-    width: "100%",
-    maxWidth: 500,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
+    borderRadius: 20,
+    padding: 20,
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
-    position: "relative",
-    minHeight: 32,
+    justifyContent: "space-between",
+    marginBottom: 16,
   },
   title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#333",
-    position: "absolute",
-    left: 40,
-    right: 40,
-    textAlign: "center",
-    numberOfLines: 1,
+    fontSize: 20,
+    fontWeight: "600",
+    flex: 1,
   },
   closeButton: {
-    marginLeft: "auto",
-    zIndex: 1,
+    margin: 0,
   },
   input: {
-    marginVertical: 10,
-    paddingHorizontal: 10,
-    fontSize: 16,
-    height: 50,
-    backgroundColor: "#F5F5F5",
-    borderRadius: 10,
+    marginBottom: 16,
   },
-  buttonContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 12,
+  inputOutline: {
+    borderRadius: 12,
   },
-  addButton: {
-    flex: 1,
-    backgroundColor: "#8A7DF7",
-    height: 50,
-    justifyContent: "center",
-    paddingHorizontal: 5,
+  saveButton: {
+    borderRadius: 22,
   },
-  buttonLabel: {
-    fontSize: 14,
-    color: "white",
-    textAlign: "center",
+  saveButtonContent: {
+    paddingVertical: 6,
+  },
+  saveButtonLabel: {
+    fontSize: 15,
+    fontWeight: "600",
   },
 });

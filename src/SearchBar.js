@@ -13,12 +13,13 @@
 // limitations under the License.
 
 import * as React from "react";
-import {View} from "react-native";
-import {Searchbar} from "react-native-paper";
+import {StyleSheet, View} from "react-native";
+import {Searchbar, useTheme} from "react-native-paper";
 import {useTranslation} from "react-i18next";
 
 const SearchBar = ({onSearch}) => {
   const {t} = useTranslation();
+  const theme = useTheme();
   const [searchQuery, setSearchQuery] = React.useState("");
 
   const onChangeSearch = (query) => {
@@ -32,30 +33,26 @@ const SearchBar = ({onSearch}) => {
         placeholder={t("searchBar.Search")}
         onChangeText={onChangeSearch}
         value={searchQuery}
-        style={styles.searchbar}
+        style={[styles.searchbar, {backgroundColor: theme.colors.surfaceVariant}]}
         inputStyle={styles.inputStyle}
+        elevation={0}
       />
     </View>
   );
 };
 
-const styles = {
+const styles = StyleSheet.create({
   container: {
-    alignItems: "center",
-    paddingTop: 2,
+    paddingHorizontal: 4,
   },
   searchbar: {
-    height: 56,
-    backgroundColor: "#E6DFF3",
-    borderRadius: 99,
-    width: "95%",
+    height: 44,
+    borderRadius: 22,
   },
   inputStyle: {
     minHeight: 0,
-    textAlignVertical: "center",
-    justifyContent: "center",
-    alignItems: "center",
+    fontSize: 14,
   },
-};
+});
 
 export default SearchBar;

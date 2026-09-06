@@ -1,24 +1,20 @@
 {
   "expo": {
-    "name": "Casdoor",
-    "slug": "casdoor-authenticator",
-    "version": "1.25.0",
+    "name": "Authenticator",
+    "slug": "budhori-authenticator",
+    "version": "0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "scheme": "casdoor-authenticator",
+    "scheme": "budhori-authenticator",
     "sdkVersion": "52.0.0",
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
+    "runtimeVersion": "1.25.0",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.budhori.authenticator",

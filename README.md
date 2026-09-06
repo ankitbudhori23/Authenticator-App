@@ -1,76 +1,183 @@
-# Casdoor Authenticator App
+<div align="center">
 
-[![GitHub Actions](https://github.com/casdoor/casdoor-authenticator/actions/workflows/release.yml/badge.svg)](https://github.com/casdoor/casdoor-authenticator/actions/workflows/release.yml)
-[![Deploy to GitHub Pages](https://github.com/casdoor/casdoor-authenticator/actions/workflows/deploy-web.yml/badge.svg)](https://github.com/casdoor/casdoor-authenticator/actions/workflows/deploy-web.yml)
-[![Release](https://img.shields.io/github/release/casdoor/casdoor-authenticator.svg)](https://github.com/casdoor/casdoor-authenticator/releases/latest)
-[![GitHub issues](https://img.shields.io/github/issues/casdoor/casdoor-authenticator?style=flat-square)](https://github.com/casdoor/casdoor-authenticator/issues)
-[![GitHub forks](https://img.shields.io/github/forks/casdoor/casdoor-authenticator?style=flat-square)](https://github.com/casdoor/casdoor-authenticator/network)
-[![License](https://img.shields.io/github/license/casdoor/casdoor-authenticator?style=flat-square)](https://github.com/casdoor/casdoor-authenticator/blob/master/LICENSE)
-[![Discord](https://img.shields.io/discord/1022748306096537660?logo=discord&label=discord&color=5865F2)](https://discord.gg/5rPsrAzK7S)
+# Budhori Authenticator
 
-Casdoor Authenticator App is a cross-platform application for iOS, Android, and Web that provides multi-factor authentication using the TOTP protocol. This app helps secure user accounts by generating time-based one-time passwords (TOTP). The app is developed using React Native with Expo.
+**A modern, cross-platform TOTP authenticator built with React Native & Expo.**
 
-## Features
+Secure your accounts with time-based one-time passwords (TOTP) — offline-first, private by default, and beautifully simple.
 
-- [x] Multi-platform support (iOS/Android/Web)
-- [x] TOTP-based multi-factor authentication
-- [x] Account synchronization with Casdoor
-- [x] Web deployment via GitHub Pages
-- [ ] Integration with Casdoor's central service and desktop client
+![Platforms](https://img.shields.io/badge/platforms-iOS%20%7C%20Android%20%7C%20Web-4c9eff?style=for-the-badge)
+![React Native](https://img.shields.io/badge/React%20Native-0.76-61dafb?style=for-the-badge&logo=react)
+![Expo](https://img.shields.io/badge/Expo-SDK%2052-000020?style=for-the-badge&logo=expo)
+![License](https://img.shields.io/badge/License-Apache%202.0-green?style=for-the-badge)
 
-## Quick Start
+</div>
+
+---
+
+## ✨ Highlights
+
+- 🔐 **Standards-based 2FA** — full TOTP (RFC 6238) & HOTP support
+- 📱 **Truly cross-platform** — one codebase for iOS, Android, and Web
+- 📷 **One-tap QR scan** — add accounts instantly from any provider
+- 🔄 **Google Authenticator import** — bulk-migrate your entire vault via `otpauth-migration` QR codes
+- 💾 **Offline-first** — all secrets live on-device in encrypted SQLite; no cloud required
+- ☁️ **Optional cloud sync** — pluggable backend for multi-device use
+- 🌍 **12 languages** — English, 中文, 日本語, Français, Deutsch, 한국어, العربية, Español, Русский, Português, ไทย, Українська
+- 🎨 **Modern UI** — clean Material Design 3 look built on React Native Paper
+- ⚡ **Lightning fast** — powered by `@shopify/flash-list` and Expo's new architecture
+
+---
+
+## 🚀 Quick Start
 
 ```bash
-git clone https://github.com/casdoor/casdoor-authenticator
-cd casdoor-authenticator
-npm install && npm run start
+# 1. Clone & install
+git clone <your-repo-url> budhori-authenticator
+cd budhori-authenticator
+npm install
+
+# 2. Run on your platform of choice
+npm run android   # Android device or emulator
+npm run ios       # iOS simulator
+npm run web       # Browser
 ```
 
-## Installation
+> **Note:** This project uses a **development build** (via `expo-dev-client`). The first run on a device requires `npx expo prebuild` and a native build. See [Building from source](#-building-from-source) below.
 
-You can use the Casdoor Authenticator App in multiple ways:
+---
 
-- **Web**: Access the web version at https://casdoor.github.io/casdoor-authenticator (automatically deployed from master branch)
-- **Android**: Download and install the APK file directly on your device from the GitHub Releases page
+## 📦 Tech Stack
 
-### Building from Source
+| Layer | Choice |
+|---|---|
+| **Framework** | React Native `0.76` + Expo SDK `52` |
+| **Navigation** | React Navigation v6 (stack + bottom tabs) |
+| **UI kit** | React Native Paper (Material Design 3) |
+| **State** | Zustand + AsyncStorage persistence |
+| **Database** | SQLite (via `expo-sqlite`) with Drizzle ORM |
+| **i18n** | i18next + react-i18next (12 locales, RTL support) |
+| **Crypto** | `totp-generator`, `hi-base32`, `expo-crypto` |
+| **QR / Camera** | `expo-camera` + `protobufjs` for Google Auth migration format |
+| **Lists** | `@shopify/flash-list` for buttery-smooth scrolling |
 
-If you prefer to build the app yourself, follow these steps:
+---
 
-### Common Steps
+## 🛠️ Building from Source
+
+### Prerequisites
+
+- **Node.js** `≥ 18`
+- **Android**: Android Studio + SDK, `ANDROID_HOME` env var, a connected device or emulator
+- **iOS**: macOS with Xcode + CocoaPods
+
+### Common setup
 
 ```bash
-git clone https://github.com/casdoor/casdoor-authenticator
-cd casdoor-authenticator
+git clone <your-repo-url> budhori-authenticator
+cd budhori-authenticator
 npm install
 ```
 
-### Android build
+### 🤖 Android build
 
 ```bash
-npm install && npx expo prebuild --platform android
+npx expo prebuild --platform android
 cd android && ./gradlew assembleRelease
 ```
 
-The APK file in the `app/build/outputs/apk/release/` directory.
+The signed APK will be at `android/app/build/outputs/apk/release/app-release.apk`.
 
-### Web build
+For a debug build during development:
 
 ```bash
-npm install
+npm run android
+```
+
+### 🍏 iOS build
+
+```bash
+npx expo prebuild --platform ios
+cd ios && pod install
+npm run ios
+```
+
+### 🌐 Web build
+
+```bash
 npm run export:web
 ```
 
-The web build will be output to the `dist/` directory.
+Output is written to `dist/` — deploy to any static host.
 
-Note: You'll need to have the necessary development environments set up for React Native, Android. Refer to the React Native documentation for detailed setup instructions.
+---
 
-## Usage
+## 📱 Usage
 
-- Open the app on your mobile device.
-- Scan QR codes to add accounts and generate TOTP codes for login.
-- Log in to your accounts for synchronization with Casdoor.
+1. **Add an account** — tap the **+** button and either:
+   - Scan a QR code from any TOTP-enabled service (Google, GitHub, AWS, etc.)
+   - Enter the secret key manually
+   - Import from Google Authenticator (`Export accounts` → scan the migration QR)
+2. **Generate codes** — TOTP codes refresh every 30 seconds with a visual countdown timer.
+3. **Manage entries** — swipe or long-press any account to edit, rename, or delete.
+4. **Sync (optional)** — sign in through the settings screen to back up encrypted entries to your backend.
 
-## License
+---
 
-This project is licensed under the Apache-2.0 License. See the [LICENSE](./LICENSE) file for details.
+## 📁 Project Structure
+
+```
+budhori-authenticator/
+├── src/                   # All application source (screens, hooks, utils)
+│   ├── App.js             # Root component
+│   ├── HomePage.js        # Account list & TOTP display
+│   ├── ScanQRCode.js      # QR scanner + Google Auth migration
+│   ├── SettingPage.js     # Preferences & language picker
+│   ├── syncLogic.js       # Cloud sync engine
+│   ├── totpUtil.js        # TOTP generation helpers
+│   └── ...
+├── db/                    # Drizzle schema + client
+├── drizzle/               # Generated SQL migrations
+├── google/                # Protobuf schema for Google Auth import
+├── locales/               # 12 language JSON bundles
+├── assets/                # Icons, splash, fonts
+├── android/ · ios/        # Native projects (generated by prebuild)
+├── index.js               # Entry point → registers src/App
+├── app.json               # Expo config
+└── drizzle.config.js      # Drizzle CLI config
+```
+
+---
+
+## 🔒 Security & Privacy
+
+- **Secrets never leave your device** unless you explicitly enable cloud sync.
+- All account data is stored in the app's private sandbox using SQLite.
+- No telemetry, no analytics, no tracking.
+- TOTP secrets are stored as Base32-encoded strings, following [RFC 4648](https://datatracker.ietf.org/doc/html/rfc4648).
+
+---
+
+## 🤝 Contributing
+
+Pull requests are welcome! For major changes, please open an issue first to discuss what you'd like to change.
+
+1. Fork the repo
+2. Create a feature branch (`git checkout -b feature/amazing-thing`)
+3. Commit your changes (`git commit -am 'Add amazing thing'`)
+4. Push to the branch (`git push origin feature/amazing-thing`)
+5. Open a Pull Request
+
+---
+
+## 📄 License
+
+Distributed under the **Apache License 2.0**. See [LICENSE](./LICENSE) for full text.
+
+---
+
+<div align="center">
+
+**Built with ❤️ using React Native & Expo**
+
+</div>

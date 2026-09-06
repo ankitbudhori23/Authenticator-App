@@ -13,11 +13,10 @@
 // limitations under the License.
 
 import React, {useEffect, useRef, useState} from "react";
-import {Dimensions, InteractionManager, RefreshControl, TouchableOpacity, View} from "react-native";
-import {Divider, IconButton, List, Modal, Portal, Text} from "react-native-paper";
-import {GestureHandlerRootView} from "react-native-gesture-handler";
+import {InteractionManager, KeyboardAvoidingView, Linking, Platform, RefreshControl, StyleSheet, TouchableOpacity, View} from "react-native";
+import {Button, Dialog, Modal, Portal, Text, useTheme} from "react-native-paper";
+import {TouchableOpacity as GHTouchableOpacity} from "react-native-gesture-handler";
 import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable";
-import {CountdownCircleTimer} from "react-native-countdown-circle-timer";
 import {useNetInfo} from "@react-native-community/netinfo";
 import {FlashList} from "@shopify/flash-list";
 import {useNotifications} from "react-native-notificated";
@@ -27,45 +26,46 @@ import Animated, {
   withTiming
 } from "react-native-reanimated";
 import {MaterialCommunityIcons} from "@expo/vector-icons";
-import {useNavigation} from "@react-navigation/native";
+import {useSafeAreaInsets} from "react-native-safe-area-context";
+import {CountdownCircleTimer} from "react-native-countdown-circle-timer";
+import {Camera} from "expo-camera";
+import * as Clipboard from "expo-clipboard";
 
 import SearchBar from "./SearchBar";
 import EnterAccountDetails from "./EnterAccountDetails";
 import ScanQRCode from "./ScanQRCode";
 import EditAccountDetails from "./EditAccountDetails";
-import AvatarWithFallback from "./AvatarWithFallback";
-import {useImportManager} from "./ImportManager";
+import IssuerLogo from "./IssuerLogo";
+import {ImportSheet, useImportManager} from "./ImportManager";
 import useStore from "./useStorage";
 import {useTokenRefresh, validateSecret} from "./totpUtil";
 import {useAccountSync, useAccounts, useEditAccount} from "./useAccountStore";
 
-const {width, height} = Dimensions.get("window");
 const REFRESH_INTERVAL = 10000;
-const OFFSET_X = width * 0.45;
-const OFFSET_Y = height * 0.2;
 
 export default function HomePage() {
-  const [isPlusButton, setIsPlusButton] = useState(true);
   const [showOptions, setShowOptions] = useState(false);
   const [showEnterAccountModal, setShowEnterAccountModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filteredData, setFilteredData] = useState(accounts);
+  const [filteredData, setFilteredData] = useState([]);
   const [showScanner, setShowScanner] = useState(false);
   const [showEditAccountModal, setShowEditAccountModal] = useState(false);
   const [editingAccount, setEditingAccount] = useState(null);
   const [placeholder, setPlaceholder] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  const [accountToDelete, setAccountToDelete] = useState(null);
+  const [permissionDialogVisible, setPermissionDialogVisible] = useState(false);
   const {isConnected} = useNetInfo();
   const [canSync, setCanSync] = useState(false);
-  const [key, setKey] = useState(0);
-  const swipeableRef = useRef(null);
+  const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const {userInfo, serverUrl, token} = useStore();
   const {startSync} = useAccountSync();
   const {accounts} = useAccounts();
   const {setAccount, updateAccount, insertAccount, insertAccounts, deleteAccount} = useEditAccount();
   const {notify} = useNotifications();
   const {t} = useTranslation();
-  const {showImportOptions} = useImportManager((data) => {
+  const {showImportOptions, visible: importSheetVisible, dismiss: dismissImportSheet, handleSelect: handleImportSelect} = useImportManager((data) => {
     handleAddAccount(data);
   }, (err) => {
     notify("error", {
@@ -75,10 +75,8 @@ export default function HomePage() {
       },
     });
   }, () => {
-    setShowScanner(true);
+    requestCameraAndScan();
   });
-  const navigation = useNavigation();
-
   useEffect(() => {
     setCanSync(Boolean(isConnected && userInfo && serverUrl));
   }, [isConnected, userInfo, serverUrl]);
@@ -106,19 +104,9 @@ export default function HomePage() {
     if (canSync) {
       const syncError = await startSync(userInfo, serverUrl, token);
       if (syncError) {
-        notify("error", {
-          params: {
-            title: "Sync error",
-            description: syncError,
-          },
-        });
+        notify("error", {params: {title: "Sync error", description: syncError}});
       } else {
-        notify("success", {
-          params: {
-            title: "Sync success",
-            description: "All your accounts are up to date.",
-          },
-        });
+        notify("success", {params: {title: "Sync success", description: "All your accounts are up to date."}});
       }
     }
     setRefreshing(false);
@@ -135,7 +123,6 @@ export default function HomePage() {
   };
 
   const handleEditAccount = (account) => {
-    closeSwipeableMenu();
     setEditingAccount(account);
     setPlaceholder(account.accountName);
     setShowEditAccountModal(true);
@@ -151,16 +138,49 @@ export default function HomePage() {
     }
   };
 
-  const onAccountDelete = async(account) => {
-    deleteAccount(account.id);
+  const askDeleteAccount = (account) => {
+    setAccountToDelete(account);
   };
+
+  const confirmDeleteAccount = () => {
+    if (accountToDelete) {
+      deleteAccount(accountToDelete.id);
+      setAccountToDelete(null);
+    }
+  };
+
+  const cancelDeleteAccount = () => setAccountToDelete(null);
 
   const closeEditAccountModal = () => setShowEditAccountModal(false);
 
+  const requestCameraAndScan = async() => {
+    try {
+      const current = await Camera.getCameraPermissionsAsync();
+      if (current.status === "granted") {
+        setShowScanner(true);
+        return;
+      }
+      if (current.canAskAgain) {
+        const request = await Camera.requestCameraPermissionsAsync();
+        if (request.status === "granted") {
+          setShowScanner(true);
+          return;
+        }
+      }
+      setPermissionDialogVisible(true);
+    } catch (err) {
+      notify("error", {
+        params: {
+          title: t("common.error"),
+          description: err.message,
+        },
+      });
+    }
+  };
+
   const handleScanPress = () => {
-    setShowScanner(true);
-    setIsPlusButton(true);
     setShowOptions(false);
+    requestCameraAndScan();
   };
 
   const handleCloseScanner = () => setShowScanner(false);
@@ -175,13 +195,7 @@ export default function HomePage() {
     });
   };
 
-  const togglePlusButton = () => {
-    setIsPlusButton(!isPlusButton);
-    setShowOptions(!showOptions);
-  };
-
   const closeOptions = () => {
-    setIsPlusButton(true);
     setShowOptions(false);
     setShowScanner(false);
   };
@@ -198,12 +212,6 @@ export default function HomePage() {
 
   const closeEnterAccountModal = () => setShowEnterAccountModal(false);
 
-  const closeSwipeableMenu = () => {
-    if (swipeableRef.current) {
-      swipeableRef.current.close();
-    }
-  };
-
   const handleSearch = (query) => {
     setSearchQuery(query);
     setFilteredData(query.trim() !== ""
@@ -212,202 +220,237 @@ export default function HomePage() {
     );
   };
 
-  const renderRightActions = (progress, dragX, account, onEdit, onDelete) => {
-    const styleAnimation = useAnimatedStyle(() => {
-      return {
-        transform: [{translateX: dragX.value + 160}],
-      };
-    });
+  const ACTION_WIDTH = 78;
+  const ACTIONS_TOTAL_WIDTH = ACTION_WIDTH * 2;
+
+  const SwipeActionButton = ({icon, label, background, color, onPress, cornerSide}) => {
+    const cornerStyle = cornerSide === "left"
+      ? {borderTopLeftRadius: 16, borderBottomLeftRadius: 16}
+      : cornerSide === "right"
+        ? {borderTopRightRadius: 16, borderBottomRightRadius: 16}
+        : null;
 
     return (
-      <Animated.View style={[{width: 160, flexDirection: "row"}, styleAnimation]}>
-        <TouchableOpacity
-          style={{
-            flex: 1,
-            backgroundColor: "#E6DFF3",
-            justifyContent: "center",
-            alignItems: "center",
-          }}
+      <GHTouchableOpacity
+        style={[styles.swipeAction, {width: ACTION_WIDTH, backgroundColor: background}, cornerStyle]}
+        onPress={onPress}
+      >
+        <MaterialCommunityIcons name={icon} size={22} color={color} />
+        <Text style={{marginTop: 4, color, fontSize: 12}}>{label}</Text>
+      </GHTouchableOpacity>
+    );
+  };
+
+  const RightActions = ({dragX, swipeableRef, account, onEdit, onDelete}) => {
+    const styleAnimation = useAnimatedStyle(() => ({
+      transform: [{translateX: dragX.value + ACTIONS_TOTAL_WIDTH}],
+    }));
+
+    return (
+      <Animated.View style={[styles.swipeContainer, {width: ACTIONS_TOTAL_WIDTH}, styleAnimation]}>
+        <SwipeActionButton
+          icon="pencil"
+          label={t("common.edit")}
+          background={theme.colors.surfaceVariant}
+          color={theme.colors.onSurfaceVariant}
           onPress={() => {
-            dragX.value = withTiming(0);
+            swipeableRef.current?.close();
             onEdit(account);
           }}
-        >
-          <MaterialCommunityIcons name="pencil" size={24} color="#666" />
-          <Text style={{marginTop: 4, color: "#666"}}>
-            {t("common.edit")}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={{
-            flex: 1,
-            backgroundColor: "#FF6B6B",
-            justifyContent: "center",
-            alignItems: "center",
-          }}
+        />
+        <SwipeActionButton
+          icon="trash-can"
+          label={t("common.delete")}
+          background={theme.colors.error}
+          color={theme.colors.onError}
+          cornerSide="right"
           onPress={() => {
-            dragX.value = withTiming(0);
+            swipeableRef.current?.close();
             onDelete(account);
           }}
-        >
-          <MaterialCommunityIcons name="trash-can" size={24} color="#FFF" />
-          <Text style={{marginTop: 4, color: "#FFF"}}>
-            {t("common.delete")}
-          </Text>
-        </TouchableOpacity>
+        />
       </Animated.View>
     );
   };
 
-  const handleItemPress = (item) => {
-    navigation.navigate("ItemDetailPage", {
-      item: {
-        ...item,
-        changedAt: item.changedAt.toISOString(),
+  const LeftActions = ({dragX, swipeableRef, account, onEdit, onDelete}) => {
+    const styleAnimation = useAnimatedStyle(() => ({
+      transform: [{translateX: dragX.value - ACTIONS_TOTAL_WIDTH}],
+    }));
+
+    return (
+      <Animated.View style={[styles.swipeContainer, {width: ACTIONS_TOTAL_WIDTH}, styleAnimation]}>
+        <SwipeActionButton
+          icon="trash-can"
+          label={t("common.delete")}
+          background={theme.colors.error}
+          color={theme.colors.onError}
+          cornerSide="left"
+          onPress={() => {
+            swipeableRef.current?.close();
+            onDelete(account);
+          }}
+        />
+        <SwipeActionButton
+          icon="pencil"
+          label={t("common.edit")}
+          background={theme.colors.surfaceVariant}
+          color={theme.colors.onSurfaceVariant}
+          onPress={() => {
+            swipeableRef.current?.close();
+            onEdit(account);
+          }}
+        />
+      </Animated.View>
+    );
+  };
+
+  const copyTokenToClipboard = async(token, accountName) => {
+    const cleanToken = token.replace(/\s/g, "");
+    await Clipboard.setStringAsync(cleanToken);
+    notify("success", {
+      params: {
+        title: t("itemDetail.copied"),
+        description: accountName,
       },
     });
   };
 
-  const ListItem = ({item, onPress}) => {
+  const ListItem = ({item}) => {
     const {token, timeRemaining} = useTokenRefresh(item.secretKey);
+    const isUrgent = timeRemaining <= 5;
+    const timerColor = isUrgent ? theme.colors.error : theme.colors.primary;
+    const itemSwipeableRef = useRef(null);
 
     return (
-      <GestureHandlerRootView>
+      <View style={styles.cardWrapper}>
         <Swipeable
-          ref={swipeableRef}
-          renderRightActions={(progress, dragX) =>
-            renderRightActions(progress, dragX, item, handleEditAccount, onAccountDelete)
-          }
+          ref={itemSwipeableRef}
+          renderRightActions={(_progress, dragX) => (
+            <RightActions
+              dragX={dragX}
+              swipeableRef={itemSwipeableRef}
+              account={item}
+              onEdit={handleEditAccount}
+              onDelete={askDeleteAccount}
+            />
+          )}
+          renderLeftActions={(_progress, dragX) => (
+            <LeftActions
+              dragX={dragX}
+              swipeableRef={itemSwipeableRef}
+              account={item}
+              onEdit={handleEditAccount}
+              onDelete={askDeleteAccount}
+            />
+          )}
+          leftThreshold={40}
           rightThreshold={40}
+          overshootLeft={false}
           overshootRight={false}
           friction={2}
           enableTrackpadTwoFingerGesture
-          onSwipeableOpen={() => {
-            if (swipeableRef.current) {
-              swipeableRef.current.close();
-            }
-          }}
         >
-          <List.Item
-            style={{
-              height: 80,
-              paddingVertical: 6,
-              paddingHorizontal: 16,
-              justifyContent: "center",
-            }}
-            title={
-              <View style={{justifyContent: "center", paddingLeft: 0, paddingTop: 6}}>
-                <Text variant="titleMedium" numberOfLines={1}>
-                  {item.accountName}
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => copyTokenToClipboard(token, item.accountName)}
+            style={[styles.card, {backgroundColor: theme.colors.surface}]}
+          >
+            <IssuerLogo
+              issuer={item.issuer}
+              accountName={item.accountName}
+              size={48}
+              style={styles.cardLogo}
+            />
+            <View style={styles.cardMiddle}>
+              <Text variant="bodyMedium" numberOfLines={1} style={[styles.cardName, {color: theme.colors.onSurfaceVariant}]}>
+                {item.issuer || item.accountName}
+              </Text>
+              <Text style={[styles.cardCode, {color: theme.colors.onSurface}]}>
+                {token}
+              </Text>
+            </View>
+            <CountdownCircleTimer
+              isPlaying
+              duration={30}
+              initialRemainingTime={timeRemaining}
+              colors={[theme.colors.primary, theme.colors.error]}
+              colorsTime={[10, 0]}
+              size={34}
+              strokeWidth={3}
+              trailColor={theme.colors.surfaceVariant}
+              onComplete={() => ({shouldRepeat: true, delay: 0})}
+            >
+              {({remainingTime}) => (
+                <Text style={{fontSize: 12, fontWeight: "600", color: timerColor}}>
+                  {remainingTime}
                 </Text>
-                <Text variant="titleLarge" style={{fontWeight: "bold"}}>{token}</Text>
-              </View>
-            }
-            left={() => (
-              <AvatarWithFallback
-                source={{uri: `https://cdn.casbin.org/img/social_${item.issuer?.toLowerCase()}.png`}}
-                fallbackSource={{uri: "https://cdn.casbin.org/img/social_default.png"}}
-                size={60}
-                style={{
-                  borderRadius: 10,
-                  backgroundColor: "transparent",
-                }}
-              />
-            )}
-            right={() => (
-              <View style={{justifyContent: "center", alignItems: "center"}}>
-                <CountdownCircleTimer
-                  key={key}
-                  isPlaying={true}
-                  duration={30}
-                  initialRemainingTime={timeRemaining}
-                  colors={["#004777", "#0072A0", "#0099CC", "#FF6600", "#CC3300", "#A30000"]}
-                  colorsTime={[30, 24, 18, 12, 6, 0]}
-                  size={60}
-                  onComplete={() => {
-                    setKey(prevKey => prevKey + 1);
-                    return {
-                      shouldRepeat: true,
-                      delay: 0,
-                      newInitialRemainingTime: timeRemaining,
-                    };
-                  }}
-                  strokeWidth={5}
-                >
-                  {({remainingTime}) => (
-                    <Text style={{fontSize: 18, fontWeight: "bold"}}>{remainingTime}s</Text>
-                  )}
-                </CountdownCircleTimer>
-              </View>
-            )}
-            onPress={() => handleItemPress(item)}
-          />
+              )}
+            </CountdownCircleTimer>
+          </TouchableOpacity>
         </Swipeable>
-      </GestureHandlerRootView>
+      </View>
     );
   };
 
   return (
-    <View style={{flex: 1}}>
-      <SearchBar onSearch={handleSearch} />
-      <FlashList
-        data={searchQuery.trim() !== "" ? filteredData : accounts}
-        keyExtractor={(item) => `${item.id}`}
-        extraData={key}
-        estimatedItemSize={80}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-        renderItem={({item}) => (
-          <ListItem item={item} onPress={handleItemPress} />
-        )}
-        ItemSeparatorComponent={() => <Divider />}
-      />
+    <View style={[styles.container, {backgroundColor: theme.colors.background}]}>
+      <View style={styles.listWrapper}>
+        <FlashList
+          data={searchQuery.trim() !== "" ? filteredData : accounts}
+          keyExtractor={(item) => `${item.id}`}
+          estimatedItemSize={92}
+          contentContainerStyle={{paddingHorizontal: 12, paddingTop: 8, paddingBottom: 16}}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          renderItem={({item}) => <ListItem item={item} />}
+        />
+      </View>
 
       <Portal>
         <Modal
           visible={showOptions}
           onDismiss={closeOptions}
-          contentContainerStyle={{
-            backgroundColor: "white",
-            padding: 20,
-            borderRadius: 10,
-            width: 300,
-            height: 225,
-            position: "absolute",
-            top: "50%",
-            left: "50%",
-            transform: [{translateX: -150}, {translateY: -112.5}],
-          }}
+          contentContainerStyle={styles.sheetContainer}
+          style={styles.sheetOverlay}
         >
-          <TouchableOpacity
-            style={{flexDirection: "row", alignItems: "center"}}
-            onPress={handleScanPress}
+          <View
+            style={[
+              styles.sheet,
+              {
+                backgroundColor: theme.colors.surface,
+                paddingBottom: Math.max(insets.bottom + 12, 24),
+              },
+            ]}
           >
-            <IconButton icon={"camera"} size={35} />
-            <View style={{width: 180}}>
-              <Text style={{fontSize: 18}}>{t("homepage.Scan QR Code")}</Text>
-            </View>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={{flexDirection: "row", alignItems: "center", marginTop: 10}}
-            onPress={openEnterAccountModal}
-          >
-            <IconButton icon={"keyboard"} size={35} />
-            <View style={{width: 180}}>
-              <Text style={{fontSize: 18}}>{t("homepage.Enter Secret Code")}</Text>
-            </View>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={{flexDirection: "row", alignItems: "center", marginTop: 10}}
-            onPress={openImportAccountModal}
-          >
-            <IconButton icon={"import"} size={35} />
-            <View style={{width: 180}}>
-              <Text style={{fontSize: 18}}>{t("homepage.Import from other app")}</Text>
-            </View>
-          </TouchableOpacity>
+            <View style={[styles.sheetHandle, {backgroundColor: theme.colors.outline}]} />
+            <Text style={[styles.sheetTitle, {color: theme.colors.onSurface}]}>
+              {t("homepage.Add account")}
+            </Text>
+            <TouchableOpacity style={styles.sheetOption} onPress={handleScanPress} activeOpacity={0.7}>
+              <View style={[styles.sheetIconBubble, {backgroundColor: theme.colors.primaryContainer}]}>
+                <MaterialCommunityIcons name="qrcode-scan" size={22} color={theme.colors.onPrimaryContainer} />
+              </View>
+              <Text style={[styles.sheetOptionText, {color: theme.colors.onSurface}]}>
+                {t("homepage.Scan QR Code")}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.sheetOption} onPress={openEnterAccountModal} activeOpacity={0.7}>
+              <View style={[styles.sheetIconBubble, {backgroundColor: theme.colors.primaryContainer}]}>
+                <MaterialCommunityIcons name="keyboard-outline" size={22} color={theme.colors.onPrimaryContainer} />
+              </View>
+              <Text style={[styles.sheetOptionText, {color: theme.colors.onSurface}]}>
+                {t("homepage.Enter Secret Code")}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.sheetOption} onPress={openImportAccountModal} activeOpacity={0.7}>
+              <View style={[styles.sheetIconBubble, {backgroundColor: theme.colors.primaryContainer}]}>
+                <MaterialCommunityIcons name="import" size={22} color={theme.colors.onPrimaryContainer} />
+              </View>
+              <Text style={[styles.sheetOptionText, {color: theme.colors.onSurface}]}>
+                {t("homepage.Import from other app")}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </Modal>
       </Portal>
 
@@ -415,19 +458,14 @@ export default function HomePage() {
         <Modal
           visible={showEnterAccountModal}
           onDismiss={closeEnterAccountModal}
-          contentContainerStyle={{
-            backgroundColor: "white",
-            padding: 1,
-            borderRadius: 10,
-            width: "90%",
-            height: "40%",
-            position: "absolute",
-            top: "50%",
-            left: "50%",
-            transform: [{translateX: -OFFSET_X}, {translateY: -OFFSET_Y}],
-          }}
+          contentContainerStyle={styles.sheetContainer}
+          style={styles.sheetOverlay}
         >
-          <EnterAccountDetails onClose={closeEnterAccountModal} onAdd={handleAddAccount} validateSecret={validateSecret} />
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
+            <View style={[styles.formSheet, {paddingBottom: Math.max(insets.bottom + 12, 20)}]}>
+              <EnterAccountDetails onClose={closeEnterAccountModal} onAdd={handleAddAccount} validateSecret={validateSecret} />
+            </View>
+          </KeyboardAvoidingView>
         </Modal>
       </Portal>
 
@@ -435,42 +473,224 @@ export default function HomePage() {
         <Modal
           visible={showEditAccountModal}
           onDismiss={closeEditAccountModal}
-          contentContainerStyle={{
-            backgroundColor: "white",
-            padding: 1,
-            borderRadius: 10,
-            width: "90%",
-            height: "30%",
-            position: "absolute",
-            top: "50%",
-            left: "50%",
-            transform: [{translateX: -OFFSET_X}, {translateY: -OFFSET_Y}],
-          }}
+          contentContainerStyle={styles.sheetContainer}
+          style={styles.sheetOverlay}
         >
-          <EditAccountDetails onClose={closeEditAccountModal} onEdit={onAccountEdit} placeholder={placeholder} />
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
+            <View style={[styles.formSheet, {paddingBottom: Math.max(insets.bottom + 12, 20)}]}>
+              <EditAccountDetails onClose={closeEditAccountModal} onEdit={onAccountEdit} placeholder={placeholder} />
+            </View>
+          </KeyboardAvoidingView>
         </Modal>
+      </Portal>
+
+      <ImportSheet
+        visible={importSheetVisible}
+        onDismiss={dismissImportSheet}
+        onSelect={handleImportSelect}
+      />
+
+      <Portal>
+        <Dialog
+          visible={permissionDialogVisible}
+          onDismiss={() => setPermissionDialogVisible(false)}
+          style={{backgroundColor: theme.colors.surface, borderRadius: 20}}
+        >
+          <Dialog.Icon icon="camera-off-outline" color={theme.colors.error} />
+          <Dialog.Title style={{color: theme.colors.onSurface, textAlign: "center"}}>
+            {t("qrScanner.Camera permission required")}
+          </Dialog.Title>
+          <Dialog.Content>
+            <Text style={{color: theme.colors.onSurfaceVariant, textAlign: "center"}}>
+              {t("qrScanner.To scan QR codes, enable camera access in Settings.")}
+            </Text>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setPermissionDialogVisible(false)} textColor={theme.colors.onSurfaceVariant}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              onPress={() => {
+                setPermissionDialogVisible(false);
+                Linking.openSettings();
+              }}
+              textColor={theme.colors.primary}
+            >
+              {t("qrScanner.Open Settings")}
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
+
+      <Portal>
+        <Dialog
+          visible={accountToDelete !== null}
+          onDismiss={cancelDeleteAccount}
+          style={{backgroundColor: theme.colors.surface, borderRadius: 20}}
+        >
+          <Dialog.Icon icon="alert" color={theme.colors.error} />
+          <Dialog.Title style={{color: theme.colors.onSurface, textAlign: "center"}}>
+            {t("homepage.Delete account")}
+          </Dialog.Title>
+          <Dialog.Content>
+            <Text style={{color: theme.colors.onSurfaceVariant, textAlign: "center"}}>
+              {t("homepage.Are you sure you want to delete this account?")}
+            </Text>
+            {accountToDelete && (
+              <Text style={{color: theme.colors.onSurface, textAlign: "center", marginTop: 8, fontWeight: "600"}}>
+                {accountToDelete.issuer ? `${accountToDelete.issuer} — ${accountToDelete.accountName}` : accountToDelete.accountName}
+              </Text>
+            )}
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={cancelDeleteAccount} textColor={theme.colors.onSurfaceVariant}>
+              {t("common.cancel")}
+            </Button>
+            <Button onPress={confirmDeleteAccount} textColor={theme.colors.error}>
+              {t("common.delete")}
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
       </Portal>
 
       {showScanner && (
         <ScanQRCode onClose={handleCloseScanner} showScanner={showScanner} onAdd={handleAddAccount} onError={handleScanError} />
       )}
 
-      <TouchableOpacity
-        style={{
-          position: "absolute",
-          bottom: 30,
-          right: 30,
-          width: 70,
-          height: 70,
-          borderRadius: 35,
-          backgroundColor: "#E6DFF3",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-        onPress={togglePlusButton}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={styles.bottomBarWrapper}
       >
-        <IconButton icon={isPlusButton ? "plus" : "close"} size={40} color={"white"} />
-      </TouchableOpacity>
+        <View style={[styles.bottomBar, {paddingBottom: Math.max(insets.bottom, 8), backgroundColor: theme.colors.background, borderTopColor: theme.colors.outline}]}>
+          <View style={styles.searchArea}>
+            <SearchBar onSearch={handleSearch} />
+          </View>
+          <TouchableOpacity
+            style={[styles.plusButton, {backgroundColor: theme.colors.primary}]}
+            onPress={() => setShowOptions(true)}
+            activeOpacity={0.85}
+          >
+            <MaterialCommunityIcons name="plus" size={24} color={theme.colors.onPrimary} />
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  listWrapper: {
+    flex: 1,
+  },
+  cardWrapper: {
+    marginVertical: 6,
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+  card: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    minHeight: 80,
+  },
+  cardLogo: {
+    borderRadius: 10,
+  },
+  cardMiddle: {
+    flex: 1,
+    marginLeft: 14,
+    marginRight: 10,
+    justifyContent: "center",
+  },
+  cardName: {
+    fontSize: 13,
+    fontWeight: "500",
+    marginBottom: 2,
+  },
+  cardCode: {
+    fontSize: 26,
+    fontWeight: "600",
+    letterSpacing: 3,
+  },
+  swipeContainer: {
+    flexDirection: "row",
+  },
+  swipeAction: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  sheetOverlay: {
+    justifyContent: "flex-end",
+    margin: 0,
+  },
+  sheetContainer: {
+    margin: 0,
+  },
+  sheet: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+  },
+  sheetHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: "center",
+    marginBottom: 12,
+    opacity: 0.5,
+  },
+  sheetTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    marginBottom: 8,
+  },
+  sheetOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+  },
+  sheetIconBubble: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 14,
+  },
+  sheetOptionText: {
+    fontSize: 16,
+    fontWeight: "500",
+  },
+  formSheet: {
+    paddingHorizontal: 12,
+    paddingTop: 8,
+  },
+  bottomBarWrapper: {
+    width: "100%",
+  },
+  bottomBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingTop: 6,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  searchArea: {
+    flex: 1,
+  },
+  plusButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 4,
+    marginRight: 8,
+  },
+});
