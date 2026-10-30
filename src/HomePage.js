@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import React, {useEffect, useRef, useState} from "react";
-import {InteractionManager, KeyboardAvoidingView, Linking, Platform, RefreshControl, StyleSheet, TouchableOpacity, View} from "react-native";
+import React, {useEffect, useMemo, useRef, useState} from "react";
+import {InteractionManager, KeyboardAvoidingView, Linking, Platform, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View} from "react-native";
 import {Button, Dialog, Modal, Portal, Text, useTheme} from "react-native-paper";
 import {TouchableOpacity as GHTouchableOpacity} from "react-native-gesture-handler";
 import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable";
@@ -22,14 +22,14 @@ import {FlashList} from "@shopify/flash-list";
 import {useNotifications} from "react-native-notificated";
 import {useTranslation} from "react-i18next";
 import Animated, {
-  useAnimatedStyle,
-  withTiming
+  useAnimatedStyle
 } from "react-native-reanimated";
 import {MaterialCommunityIcons} from "@expo/vector-icons";
 import {useSafeAreaInsets} from "react-native-safe-area-context";
 import {CountdownCircleTimer} from "react-native-countdown-circle-timer";
 import {Camera} from "expo-camera";
 import * as Clipboard from "expo-clipboard";
+import {useNavigation} from "@react-navigation/native";
 
 import SearchBar from "./SearchBar";
 import EnterAccountDetails from "./EnterAccountDetails";
@@ -39,7 +39,7 @@ import IssuerLogo from "./IssuerLogo";
 import {ImportSheet, useImportManager} from "./ImportManager";
 import useStore from "./useStorage";
 import {useTokenRefresh, validateSecret} from "./totpUtil";
-import {useAccountSync, useAccounts, useEditAccount} from "./useAccountStore";
+import {CATEGORIES, SORT_MODES, sortAccounts, useAccountSync, useAccounts, useEditAccount} from "./useAccountStore";
 
 const REFRESH_INTERVAL = 10000;
 
@@ -47,22 +47,25 @@ export default function HomePage() {
   const [showOptions, setShowOptions] = useState(false);
   const [showEnterAccountModal, setShowEnterAccountModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filteredData, setFilteredData] = useState([]);
   const [showScanner, setShowScanner] = useState(false);
   const [showEditAccountModal, setShowEditAccountModal] = useState(false);
   const [editingAccount, setEditingAccount] = useState(null);
-  const [placeholder, setPlaceholder] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const [accountToDelete, setAccountToDelete] = useState(null);
   const [permissionDialogVisible, setPermissionDialogVisible] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState(null);
+  const [sortMode, setSortMode] = useState(SORT_MODES.SMART);
+  const [sortSheetVisible, setSortSheetVisible] = useState(false);
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const {isConnected} = useNetInfo();
   const [canSync, setCanSync] = useState(false);
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
   const {userInfo, serverUrl, token} = useStore();
   const {startSync} = useAccountSync();
   const {accounts} = useAccounts();
-  const {setAccount, updateAccount, insertAccount, insertAccounts, deleteAccount} = useEditAccount();
+  const {setAccount, updateAccount, insertAccount, insertAccounts, deleteAccount, toggleFavorite, recordUsage} = useEditAccount();
   const {notify} = useNotifications();
   const {t} = useTranslation();
   const {showImportOptions, visible: importSheetVisible, dismiss: dismissImportSheet, handleSelect: handleImportSelect} = useImportManager((data) => {
@@ -77,13 +80,10 @@ export default function HomePage() {
   }, () => {
     requestCameraAndScan();
   });
+
   useEffect(() => {
     setCanSync(Boolean(isConnected && userInfo && serverUrl));
   }, [isConnected, userInfo, serverUrl]);
-
-  useEffect(() => {
-    setFilteredData(accounts);
-  }, [accounts]);
 
   useEffect(() => {
     if (canSync) {
@@ -98,6 +98,30 @@ export default function HomePage() {
       return () => clearInterval(timer);
     }
   }, [startSync, canSync, token]);
+
+  const activeCategories = useMemo(() => {
+    const used = new Set();
+    accounts.forEach((a) => a.category && used.add(a.category));
+    return CATEGORIES.filter((c) => used.has(c.key));
+  }, [accounts]);
+
+  const displayedAccounts = useMemo(() => {
+    let list = accounts;
+    if (showFavoritesOnly) {
+      list = list.filter((a) => a.isFavorite);
+    }
+    if (categoryFilter) {
+      list = list.filter((a) => a.category === categoryFilter);
+    }
+    if (searchQuery.trim() !== "") {
+      const q = searchQuery.toLowerCase();
+      list = list.filter((item) =>
+        item.accountName.toLowerCase().includes(q) ||
+        (item.issuer && item.issuer.toLowerCase().includes(q))
+      );
+    }
+    return sortAccounts(list, sortMode);
+  }, [accounts, showFavoritesOnly, categoryFilter, searchQuery, sortMode]);
 
   const onRefresh = async() => {
     setRefreshing(true);
@@ -124,15 +148,17 @@ export default function HomePage() {
 
   const handleEditAccount = (account) => {
     setEditingAccount(account);
-    setPlaceholder(account.accountName);
     setShowEditAccountModal(true);
   };
 
-  const onAccountEdit = async(newAccountName) => {
+  const onAccountEdit = async(updates) => {
     if (editingAccount) {
-      setAccount({...editingAccount, accountName: newAccountName, oldAccountName: editingAccount.accountName});
+      setAccount({
+        ...editingAccount,
+        ...updates,
+        oldAccountName: updates.accountName && updates.accountName !== editingAccount.accountName ? editingAccount.accountName : editingAccount.oldAccountName,
+      });
       updateAccount();
-      setPlaceholder("");
       setEditingAccount(null);
       closeEditAccountModal();
     }
@@ -214,10 +240,6 @@ export default function HomePage() {
 
   const handleSearch = (query) => {
     setSearchQuery(query);
-    setFilteredData(query.trim() !== ""
-      ? accounts && accounts.filter(item => item.accountName.toLowerCase().includes(query.toLowerCase()))
-      : accounts
-    );
   };
 
   const ACTION_WIDTH = 78;
@@ -273,45 +295,46 @@ export default function HomePage() {
     );
   };
 
-  const LeftActions = ({dragX, swipeableRef, account, onEdit, onDelete}) => {
+  const LeftActions = ({dragX, swipeableRef, account, onToggleFavorite}) => {
     const styleAnimation = useAnimatedStyle(() => ({
-      transform: [{translateX: dragX.value - ACTIONS_TOTAL_WIDTH}],
+      transform: [{translateX: dragX.value - ACTION_WIDTH}],
     }));
 
     return (
-      <Animated.View style={[styles.swipeContainer, {width: ACTIONS_TOTAL_WIDTH}, styleAnimation]}>
+      <Animated.View style={[styles.swipeContainer, {width: ACTION_WIDTH}, styleAnimation]}>
         <SwipeActionButton
-          icon="trash-can"
-          label={t("common.delete")}
-          background={theme.colors.error}
-          color={theme.colors.onError}
+          icon={account.isFavorite ? "star-off" : "star"}
+          label={account.isFavorite ? t("homepage.Unpin") : t("homepage.Pin")}
+          background={theme.colors.tertiaryContainer || "#facc15"}
+          color={theme.colors.onTertiaryContainer || "#111"}
           cornerSide="left"
           onPress={() => {
             swipeableRef.current?.close();
-            onDelete(account);
-          }}
-        />
-        <SwipeActionButton
-          icon="pencil"
-          label={t("common.edit")}
-          background={theme.colors.surfaceVariant}
-          color={theme.colors.onSurfaceVariant}
-          onPress={() => {
-            swipeableRef.current?.close();
-            onEdit(account);
+            onToggleFavorite(account);
           }}
         />
       </Animated.View>
     );
   };
 
-  const copyTokenToClipboard = async(token, accountName) => {
+  const copyTokenToClipboard = async(token, account) => {
     const cleanToken = token.replace(/\s/g, "");
     await Clipboard.setStringAsync(cleanToken);
+    recordUsage(account.id);
     notify("success", {
       params: {
         title: t("itemDetail.copied"),
-        description: accountName,
+        description: account.accountName,
+      },
+    });
+  };
+
+  const handleToggleFavorite = (account) => {
+    toggleFavorite(account.id);
+    notify("success", {
+      params: {
+        title: account.isFavorite ? t("homepage.Unpinned") : t("homepage.Pinned"),
+        description: account.issuer || account.accountName,
       },
     });
   };
@@ -321,6 +344,7 @@ export default function HomePage() {
     const isUrgent = timeRemaining <= 5;
     const timerColor = isUrgent ? theme.colors.error : theme.colors.primary;
     const itemSwipeableRef = useRef(null);
+    const categoryDef = item.category ? CATEGORIES.find((c) => c.key === item.category) : null;
 
     return (
       <View style={styles.cardWrapper}>
@@ -340,8 +364,7 @@ export default function HomePage() {
               dragX={dragX}
               swipeableRef={itemSwipeableRef}
               account={item}
-              onEdit={handleEditAccount}
-              onDelete={askDeleteAccount}
+              onToggleFavorite={handleToggleFavorite}
             />
           )}
           leftThreshold={40}
@@ -353,19 +376,32 @@ export default function HomePage() {
         >
           <TouchableOpacity
             activeOpacity={0.8}
-            onPress={() => copyTokenToClipboard(token, item.accountName)}
+            onPress={() => copyTokenToClipboard(token, item)}
+            onLongPress={() => navigation.navigate("ItemDetailPage", {item})}
             style={[styles.card, {backgroundColor: theme.colors.surface}]}
           >
-            <IssuerLogo
-              issuer={item.issuer}
-              accountName={item.accountName}
-              size={48}
-              style={styles.cardLogo}
-            />
+            <View>
+              <IssuerLogo
+                issuer={item.issuer}
+                accountName={item.accountName}
+                size={48}
+                style={styles.cardLogo}
+              />
+              {categoryDef && (
+                <View style={[styles.categoryDot, {backgroundColor: categoryDef.color}]}>
+                  <MaterialCommunityIcons name={categoryDef.icon} size={10} color="#fff" />
+                </View>
+              )}
+            </View>
             <View style={styles.cardMiddle}>
-              <Text variant="bodyMedium" numberOfLines={1} style={[styles.cardName, {color: theme.colors.onSurfaceVariant}]}>
-                {item.issuer || item.accountName}
-              </Text>
+              <View style={styles.cardNameRow}>
+                {item.isFavorite && (
+                  <MaterialCommunityIcons name="star" size={14} color="#facc15" style={{marginRight: 4}} />
+                )}
+                <Text variant="bodyMedium" numberOfLines={1} style={[styles.cardName, {color: theme.colors.onSurfaceVariant}]}>
+                  {item.issuer || item.accountName}
+                </Text>
+              </View>
               <Text style={[styles.cardCode, {color: theme.colors.onSurface}]}>
                 {token}
               </Text>
@@ -393,18 +429,142 @@ export default function HomePage() {
     );
   };
 
+  const FilterChip = ({active, label, icon, color, onPress}) => (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.85}
+      style={[
+        styles.filterChip,
+        {
+          backgroundColor: active ? (color || theme.colors.primary) : theme.colors.surfaceVariant,
+        },
+      ]}
+    >
+      {icon && (
+        <MaterialCommunityIcons
+          name={icon}
+          size={14}
+          color={active ? "#fff" : theme.colors.onSurfaceVariant}
+          style={{marginRight: 4}}
+        />
+      )}
+      <Text style={[styles.filterChipText, {color: active ? "#fff" : theme.colors.onSurfaceVariant}]}>
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+
+  const sortModeLabel = {
+    [SORT_MODES.SMART]: t("homepage.Smart"),
+    [SORT_MODES.ALPHA]: t("homepage.A-Z"),
+    [SORT_MODES.RECENT]: t("homepage.Recent"),
+    [SORT_MODES.DEFAULT]: t("homepage.Default"),
+  };
+
   return (
     <View style={[styles.container, {backgroundColor: theme.colors.background}]}>
+      {(activeCategories.length > 0 || accounts.some((a) => a.isFavorite)) && (
+        <View style={styles.filterRow}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filterScroll}
+          >
+            <FilterChip
+              active={showFavoritesOnly}
+              label={t("homepage.Favorites")}
+              icon="star"
+              color="#facc15"
+              onPress={() => setShowFavoritesOnly((v) => !v)}
+            />
+            {activeCategories.map((cat) => (
+              <FilterChip
+                key={cat.key}
+                active={categoryFilter === cat.key}
+                label={t(`categories.${cat.key}`, cat.label)}
+                icon={cat.icon}
+                color={cat.color}
+                onPress={() => setCategoryFilter((prev) => prev === cat.key ? null : cat.key)}
+              />
+            ))}
+          </ScrollView>
+          <TouchableOpacity
+            style={[styles.sortButton, {backgroundColor: theme.colors.surfaceVariant}]}
+            onPress={() => setSortSheetVisible(true)}
+          >
+            <MaterialCommunityIcons name="sort" size={16} color={theme.colors.onSurfaceVariant} />
+            <Text style={{marginLeft: 4, color: theme.colors.onSurfaceVariant, fontSize: 12}}>
+              {sortModeLabel[sortMode]}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       <View style={styles.listWrapper}>
         <FlashList
-          data={searchQuery.trim() !== "" ? filteredData : accounts}
+          data={displayedAccounts}
           keyExtractor={(item) => `${item.id}`}
           estimatedItemSize={92}
           contentContainerStyle={{paddingHorizontal: 12, paddingTop: 8, paddingBottom: 16}}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           renderItem={({item}) => <ListItem item={item} />}
+          ListEmptyComponent={() => (
+            <View style={styles.emptyState}>
+              <MaterialCommunityIcons name="shield-key-outline" size={48} color={theme.colors.onSurfaceVariant} />
+              <Text style={[styles.emptyText, {color: theme.colors.onSurfaceVariant}]}>
+                {searchQuery || categoryFilter || showFavoritesOnly
+                  ? t("homepage.No accounts match")
+                  : t("homepage.No accounts yet")}
+              </Text>
+            </View>
+          )}
         />
       </View>
+
+      <Portal>
+        <Modal
+          visible={sortSheetVisible}
+          onDismiss={() => setSortSheetVisible(false)}
+          contentContainerStyle={styles.sheetContainer}
+          style={styles.sheetOverlay}
+        >
+          <View style={[styles.sheet, {backgroundColor: theme.colors.surface, paddingBottom: Math.max(insets.bottom + 12, 24)}]}>
+            <View style={[styles.sheetHandle, {backgroundColor: theme.colors.outline}]} />
+            <Text style={[styles.sheetTitle, {color: theme.colors.onSurface}]}>
+              {t("homepage.Sort by")}
+            </Text>
+            {Object.entries(sortModeLabel).map(([key, label]) => (
+              <TouchableOpacity
+                key={key}
+                style={styles.sheetOption}
+                activeOpacity={0.7}
+                onPress={() => {
+                  setSortMode(key);
+                  setSortSheetVisible(false);
+                }}
+              >
+                <View style={[styles.sheetIconBubble, {backgroundColor: theme.colors.primaryContainer}]}>
+                  <MaterialCommunityIcons
+                    name={
+                      key === SORT_MODES.SMART ? "auto-fix"
+                        : key === SORT_MODES.ALPHA ? "sort-alphabetical-ascending"
+                          : key === SORT_MODES.RECENT ? "clock-outline" : "format-list-bulleted"
+                    }
+                    size={22}
+                    color={theme.colors.onPrimaryContainer}
+                  />
+                </View>
+                <Text style={[styles.sheetOptionText, {color: theme.colors.onSurface, flex: 1}]}>
+                  {label}
+                </Text>
+                {sortMode === key && (
+                  <MaterialCommunityIcons name="check" size={22} color={theme.colors.primary} />
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </Modal>
+      </Portal>
 
       <Portal>
         <Modal
@@ -478,7 +638,7 @@ export default function HomePage() {
         >
           <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
             <View style={[styles.formSheet, {paddingBottom: Math.max(insets.bottom + 12, 20)}]}>
-              <EditAccountDetails onClose={closeEditAccountModal} onEdit={onAccountEdit} placeholder={placeholder} />
+              <EditAccountDetails onClose={closeEditAccountModal} onEdit={onAccountEdit} account={editingAccount} />
             </View>
           </KeyboardAvoidingView>
         </Modal>
@@ -585,6 +745,36 @@ const styles = StyleSheet.create({
   listWrapper: {
     flex: 1,
   },
+  filterRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingTop: 6,
+  },
+  filterScroll: {
+    gap: 8,
+    paddingRight: 8,
+    alignItems: "center",
+  },
+  filterChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 14,
+  },
+  filterChipText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  sortButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 14,
+    marginLeft: 4,
+  },
   cardWrapper: {
     marginVertical: 6,
     borderRadius: 16,
@@ -600,16 +790,33 @@ const styles = StyleSheet.create({
   cardLogo: {
     borderRadius: 10,
   },
+  categoryDot: {
+    position: "absolute",
+    bottom: -2,
+    right: -2,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#fff",
+  },
   cardMiddle: {
     flex: 1,
     marginLeft: 14,
     marginRight: 10,
     justifyContent: "center",
   },
+  cardNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 2,
+  },
   cardName: {
     fontSize: 13,
     fontWeight: "500",
-    marginBottom: 2,
+    flexShrink: 1,
   },
   cardCode: {
     fontSize: 26,
@@ -623,6 +830,15 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+  emptyState: {
+    alignItems: "center",
+    paddingVertical: 64,
+    gap: 12,
+  },
+  emptyText: {
+    fontSize: 14,
+    fontWeight: "500",
   },
   sheetOverlay: {
     justifyContent: "flex-end",

@@ -33,18 +33,22 @@ export const useAccounts = () => {
 };
 
 const useEditAccountStore = create((set, get) => ({
-  account: {id: undefined, issuer: undefined, accountName: undefined, secretKey: undefined, oldAccountName: undefined},
+  account: {id: undefined, issuer: undefined, accountName: undefined, secretKey: undefined, oldAccountName: undefined, category: undefined, notes: undefined, backupCodes: undefined, isFavorite: undefined},
   setAccount: (account) => {
     set({account});
   },
   updateAccount: () => {
-    const {id, accountName, issuer, secretKey, oldAccountName} = get().account;
+    const {id, accountName, issuer, secretKey, oldAccountName, category, notes, backupCodes, isFavorite} = get().account;
     if (!id) {return;}
 
     const updateData = {};
     if (accountName) {updateData.accountName = accountName;}
     if (issuer) {updateData.issuer = issuer;}
     if (secretKey) {updateData.secretKey = secretKey;}
+    if (category !== undefined) {updateData.category = category;}
+    if (notes !== undefined) {updateData.notes = notes;}
+    if (backupCodes !== undefined) {updateData.backupCodes = backupCodes;}
+    if (isFavorite !== undefined) {updateData.isFavorite = isFavorite;}
 
     if (Object.keys(updateData).length > 0) {
       const currentAccount = db.select().from(schema.accounts)
@@ -64,12 +68,16 @@ const useEditAccountStore = create((set, get) => ({
         accountName: undefined,
         oldAccountName: undefined,
         secretKey: undefined,
+        category: undefined,
+        notes: undefined,
+        backupCodes: undefined,
+        isFavorite: undefined,
       },
     });
   },
 
   insertAccount: async() => {
-    const {accountName, issuer, secretKey} = get().account;
+    const {accountName, issuer, secretKey, category, notes, backupCodes, isFavorite} = get().account;
     const origin = await AsyncStorage.getItem("origin");
     if (!accountName || !secretKey) {return;}
     const insertWithDuplicateCheck = (tx, baseAccName) => {
@@ -113,6 +121,10 @@ const useEditAccountStore = create((set, get) => ({
             secretKey,
             token: generateToken(secretKey),
             origin: origin || null,
+            category: category || null,
+            notes: notes || null,
+            backupCodes: backupCodes || null,
+            isFavorite: isFavorite || false,
           })
           .run();
 
@@ -126,7 +138,7 @@ const useEditAccountStore = create((set, get) => ({
       const finalAccountName = db.transaction((tx) => {
         return insertWithDuplicateCheck(tx, accountName);
       });
-      set({account: {id: undefined, issuer: undefined, accountName: undefined, secretKey: undefined}});
+      set({account: {id: undefined, issuer: undefined, accountName: undefined, secretKey: undefined, category: undefined, notes: undefined, backupCodes: undefined, isFavorite: undefined}});
       return finalAccountName;
     } catch (error) {
       return null;
@@ -214,6 +226,50 @@ const useEditAccountStore = create((set, get) => ({
       )
       .run();
   },
+
+  toggleFavorite: async(id) => {
+    const current = db.select().from(schema.accounts)
+      .where(eq(schema.accounts.id, Number(id))).limit(1).get();
+    if (!current) {return;}
+    db.update(schema.accounts)
+      .set({isFavorite: !current.isFavorite, changedAt: new Date()})
+      .where(eq(schema.accounts.id, id))
+      .run();
+  },
+
+  setCategory: async(id, category) => {
+    db.update(schema.accounts)
+      .set({category: category || null, changedAt: new Date()})
+      .where(eq(schema.accounts.id, id))
+      .run();
+  },
+
+  setNotes: async(id, notes) => {
+    db.update(schema.accounts)
+      .set({notes: notes || null, changedAt: new Date()})
+      .where(eq(schema.accounts.id, id))
+      .run();
+  },
+
+  setBackupCodes: async(id, backupCodes) => {
+    db.update(schema.accounts)
+      .set({backupCodes: backupCodes || null, changedAt: new Date()})
+      .where(eq(schema.accounts.id, id))
+      .run();
+  },
+
+  recordUsage: async(id) => {
+    const current = db.select().from(schema.accounts)
+      .where(eq(schema.accounts.id, Number(id))).limit(1).get();
+    if (!current) {return;}
+    db.update(schema.accounts)
+      .set({
+        usageCount: (current.usageCount || 0) + 1,
+        lastUsedAt: new Date(),
+      })
+      .where(eq(schema.accounts.id, id))
+      .run();
+  },
 }));
 
 export const useEditAccount = () => useEditAccountStore(state => ({
@@ -224,6 +280,11 @@ export const useEditAccount = () => useEditAccountStore(state => ({
   insertAccounts: state.insertAccounts,
   deleteAccount: state.deleteAccount,
   deleteAccountByOrigin: state.deleteAccountByOrigin,
+  toggleFavorite: state.toggleFavorite,
+  setCategory: state.setCategory,
+  setNotes: state.setNotes,
+  setBackupCodes: state.setBackupCodes,
+  recordUsage: state.recordUsage,
 }));
 
 const useAccountSyncStore = create((set, get) => ({
@@ -274,3 +335,51 @@ export const useUpdateAccountToken = () => useUpdateAccountTokenStore(state => (
   updateToken: state.updateToken,
   updateAllTokens: state.updateAllTokens,
 }));
+
+export const CATEGORIES = [
+  {key: "banking", label: "Banking", icon: "bank", color: "#22c55e"},
+  {key: "social", label: "Social", icon: "account-group", color: "#3b82f6"},
+  {key: "work", label: "Work", icon: "briefcase", color: "#8b5cf6"},
+  {key: "personal", label: "Personal", icon: "heart", color: "#ec4899"},
+  {key: "crypto", label: "Crypto", icon: "bitcoin", color: "#f59e0b"},
+  {key: "gaming", label: "Gaming", icon: "gamepad-variant", color: "#ef4444"},
+  {key: "shopping", label: "Shopping", icon: "cart", color: "#06b6d4"},
+  {key: "other", label: "Other", icon: "shape-outline", color: "#64748b"},
+];
+
+export const SORT_MODES = {
+  DEFAULT: "default",
+  SMART: "smart",
+  ALPHA: "alpha",
+  RECENT: "recent",
+};
+
+export const sortAccounts = (accounts, mode = SORT_MODES.SMART) => {
+  const list = [...accounts];
+  const favorites = list.filter((a) => a.isFavorite);
+  const others = list.filter((a) => !a.isFavorite);
+
+  const applyMode = (arr) => {
+    switch (mode) {
+    case SORT_MODES.ALPHA:
+      return arr.sort((a, b) => (a.issuer || a.accountName).localeCompare(b.issuer || b.accountName));
+    case SORT_MODES.RECENT:
+      return arr.sort((a, b) => (b.lastUsedAt ? new Date(b.lastUsedAt).getTime() : 0) - (a.lastUsedAt ? new Date(a.lastUsedAt).getTime() : 0));
+    case SORT_MODES.SMART: {
+      const now = Date.now();
+      const score = (a) => {
+        const count = a.usageCount || 0;
+        const recencyMs = a.lastUsedAt ? now - new Date(a.lastUsedAt).getTime() : Infinity;
+        const recencyDays = recencyMs / (1000 * 60 * 60 * 24);
+        const recencyBoost = recencyDays === Infinity ? 0 : Math.max(0, 30 - recencyDays);
+        return count * 2 + recencyBoost;
+      };
+      return arr.sort((a, b) => score(b) - score(a));
+    }
+    default:
+      return arr;
+    }
+  };
+
+  return [...applyMode(favorites), ...applyMode(others)];
+};

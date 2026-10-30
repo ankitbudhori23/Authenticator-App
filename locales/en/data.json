@@ -20,6 +20,7 @@
   },
   "editAccount": {
     "Enter new account name": "Enter new account name",
+    "Edit account": "Edit account",
     "Account Name is required": "Account Name is required",
     "Secret Key is required": "Secret Key is required",
     "Please fill in all the fields!": "Please fill in all the fields!",
@@ -28,7 +29,14 @@
     "Account Name": "Account Name",
     "Secret Key": "Secret Key",
     "Time based": "Time based",
-    "Counter based": "Counter based"
+    "Counter based": "Counter based",
+    "Issuer": "Issuer (e.g. Google, GitHub)",
+    "Category": "Category",
+    "Notes": "Notes",
+    "Backup / Recovery codes": "Backup / Recovery codes",
+    "One code per line": "One code per line",
+    "Pin to top": "Pin to top",
+    "Organize (optional)": "Organize (optional)"
   },
   "enterCasdoorSDKConfig": {
     "Please fill in all the fields!": "Please fill in all the fields!",
@@ -51,7 +59,29 @@
     "Add account": "Add account",
     "Next": "Next",
     "Delete account": "Delete account",
-    "Are you sure you want to delete this account?": "Are you sure you want to delete this account?"
+    "Are you sure you want to delete this account?": "Are you sure you want to delete this account?",
+    "Favorites": "Favorites",
+    "Pin": "Pin",
+    "Unpin": "Unpin",
+    "Pinned": "Pinned to top",
+    "Unpinned": "Removed from favorites",
+    "Sort by": "Sort by",
+    "Smart": "Smart",
+    "A-Z": "A-Z",
+    "Recent": "Recent",
+    "Default": "Default",
+    "No accounts yet": "No accounts yet. Tap + to add one.",
+    "No accounts match": "No accounts match your filters."
+  },
+  "categories": {
+    "banking": "Banking",
+    "social": "Social",
+    "work": "Work",
+    "personal": "Personal",
+    "crypto": "Crypto",
+    "gaming": "Gaming",
+    "shopping": "Shopping",
+    "other": "Other"
   },
   "importManager": {
     "Select app to import from": "Select app to import from",
@@ -118,6 +148,11 @@
     "origin": "Origin",
     "notSpecified": "Not specified",
     "neverSynced": "Never synced",
-    "copied": "Copied"
+    "copied": "Copied",
+    "notes": "Notes",
+    "backupCodes": "Backup Codes",
+    "details": "Details",
+    "usesLabel": "Uses",
+    "lastUsed": "Last used"
   }
 }

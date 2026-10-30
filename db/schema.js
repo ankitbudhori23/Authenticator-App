@@ -26,6 +26,12 @@ export const accounts = sqliteTable("accounts", {
   changedAt: integer("changed_at", {mode: "timestamp_ms"}).default(sql`(CURRENT_TIMESTAMP)`),
   syncAt: integer("sync_at", {mode: "timestamp_ms"}).default(null),
   origin: text("origin").default(null),
+  isFavorite: integer("is_favorite", {mode: "boolean"}).default(false),
+  category: text("category").default(null),
+  notes: text("notes").default(null),
+  backupCodes: text("backup_codes").default(null),
+  usageCount: integer("usage_count", {mode: "number"}).default(0),
+  lastUsedAt: integer("last_used_at", {mode: "timestamp_ms"}).default(null),
 }, (accounts) => ({
   unq: unique().on(accounts.accountName, accounts.issuer),
 })

@@ -13,11 +13,14 @@
 // limitations under the License.
 
 import React, {useCallback, useState} from "react";
-import {StyleSheet, TouchableOpacity, View} from "react-native";
-import {Button, IconButton, Text, TextInput, useTheme} from "react-native-paper";
+import {ScrollView, StyleSheet, TouchableOpacity, View} from "react-native";
+import {Button, IconButton, Switch, Text, TextInput, useTheme} from "react-native-paper";
+import {MaterialCommunityIcons} from "@expo/vector-icons";
 import {useNotifications} from "react-native-notificated";
 import PropTypes from "prop-types";
 import {useTranslation} from "react-i18next";
+
+import {CATEGORIES} from "./useAccountStore";
 
 const EnterAccountDetails = ({onClose, onAdd, validateSecret}) => {
   const {notify} = useNotifications();
@@ -25,10 +28,16 @@ const EnterAccountDetails = ({onClose, onAdd, validateSecret}) => {
   const theme = useTheme();
   const [accountName, setAccountName] = useState("");
   const [secretKey, setSecretKey] = useState("");
+  const [issuer, setIssuer] = useState("");
+  const [category, setCategory] = useState(null);
+  const [notes, setNotes] = useState("");
+  const [backupCodes, setBackupCodes] = useState("");
+  const [isFavorite, setIsFavorite] = useState(false);
   const [secretError, setSecretError] = useState("");
   const [accountNameError, setAccountNameError] = useState("");
   const [selectedType, setSelectedType] = useState("Time based");
   const [showPassword, setShowPassword] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const handleAddAccount = useCallback(() => {
     if (accountName.trim() === "") {
@@ -59,12 +68,25 @@ const EnterAccountDetails = ({onClose, onAdd, validateSecret}) => {
       return;
     }
 
-    onAdd({accountName, secretKey});
+    onAdd({
+      accountName,
+      secretKey,
+      issuer: issuer || null,
+      category,
+      notes: notes || null,
+      backupCodes: backupCodes || null,
+      isFavorite,
+    });
     setAccountName("");
     setSecretKey("");
+    setIssuer("");
+    setCategory(null);
+    setNotes("");
+    setBackupCodes("");
+    setIsFavorite(false);
     setAccountNameError("");
     setSecretError("");
-  }, [accountName, secretKey, secretError, onAdd, t, notify]);
+  }, [accountName, secretKey, issuer, category, notes, backupCodes, isFavorite, secretError, onAdd, t, notify]);
 
   const handleSecretKeyChange = useCallback((text) => {
     setSecretKey(text);
@@ -101,67 +123,159 @@ const EnterAccountDetails = ({onClose, onAdd, validateSecret}) => {
         />
       </View>
 
-      <TextInput
-        label={t("editAccount.Account Name")}
-        value={accountName}
-        onChangeText={handleAccountNameChange}
-        error={!!accountNameError}
-        mode="outlined"
-        style={styles.input}
-        outlineStyle={styles.inputOutline}
-      />
+      <ScrollView keyboardShouldPersistTaps="handled" style={{maxHeight: 480}}>
+        <TextInput
+          label={t("editAccount.Account Name")}
+          value={accountName}
+          onChangeText={handleAccountNameChange}
+          error={!!accountNameError}
+          mode="outlined"
+          style={styles.input}
+          outlineStyle={styles.inputOutline}
+        />
 
-      <TextInput
-        label={t("editAccount.Secret Key")}
-        value={secretKey}
-        onChangeText={handleSecretKeyChange}
-        secureTextEntry={!showPassword}
-        error={!!secretError}
-        mode="outlined"
-        style={styles.input}
-        outlineStyle={styles.inputOutline}
-        right={
-          <TextInput.Icon
-            icon={showPassword ? "eye-off" : "eye"}
-            onPress={() => setShowPassword(!showPassword)}
-          />
-        }
-      />
+        <TextInput
+          label={t("editAccount.Secret Key")}
+          value={secretKey}
+          onChangeText={handleSecretKeyChange}
+          secureTextEntry={!showPassword}
+          error={!!secretError}
+          mode="outlined"
+          style={styles.input}
+          outlineStyle={styles.inputOutline}
+          right={
+            <TextInput.Icon
+              icon={showPassword ? "eye-off" : "eye"}
+              onPress={() => setShowPassword(!showPassword)}
+            />
+          }
+        />
 
-      <View style={styles.typeRow}>
-        {typeOptions.map((opt) => {
-          const active = selectedType === opt.value;
-          return (
-            <TouchableOpacity
-              key={opt.value}
-              onPress={() => setSelectedType(opt.value)}
-              activeOpacity={0.8}
-              style={[
-                styles.typeChip,
-                {
-                  backgroundColor: active ? theme.colors.primaryContainer : theme.colors.surfaceVariant,
-                  borderColor: active ? theme.colors.primary : "transparent",
-                },
-              ]}
-            >
-              <IconButton
-                icon={opt.icon}
-                size={18}
-                iconColor={active ? theme.colors.onPrimaryContainer : theme.colors.onSurfaceVariant}
-                style={styles.typeChipIcon}
-              />
-              <Text
+        <View style={styles.typeRow}>
+          {typeOptions.map((opt) => {
+            const active = selectedType === opt.value;
+            return (
+              <TouchableOpacity
+                key={opt.value}
+                onPress={() => setSelectedType(opt.value)}
+                activeOpacity={0.8}
                 style={[
-                  styles.typeChipText,
-                  {color: active ? theme.colors.onPrimaryContainer : theme.colors.onSurfaceVariant},
+                  styles.typeChip,
+                  {
+                    backgroundColor: active ? theme.colors.primaryContainer : theme.colors.surfaceVariant,
+                    borderColor: active ? theme.colors.primary : "transparent",
+                  },
                 ]}
               >
-                {opt.label}
+                <IconButton
+                  icon={opt.icon}
+                  size={18}
+                  iconColor={active ? theme.colors.onPrimaryContainer : theme.colors.onSurfaceVariant}
+                  style={styles.typeChipIcon}
+                />
+                <Text
+                  style={[
+                    styles.typeChipText,
+                    {color: active ? theme.colors.onPrimaryContainer : theme.colors.onSurfaceVariant},
+                  ]}
+                >
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <TouchableOpacity
+          onPress={() => setShowAdvanced((v) => !v)}
+          activeOpacity={0.7}
+          style={styles.advancedToggle}
+        >
+          <MaterialCommunityIcons
+            name={showAdvanced ? "chevron-down" : "chevron-right"}
+            size={18}
+            color={theme.colors.onSurfaceVariant}
+          />
+          <Text style={{color: theme.colors.onSurfaceVariant, fontWeight: "600", marginLeft: 4}}>
+            {t("editAccount.Organize (optional)")}
+          </Text>
+        </TouchableOpacity>
+
+        {showAdvanced && (
+          <View>
+            <TextInput
+              label={t("editAccount.Issuer")}
+              value={issuer}
+              onChangeText={setIssuer}
+              mode="outlined"
+              style={styles.input}
+              outlineStyle={styles.inputOutline}
+            />
+
+            <Text style={[styles.sectionLabel, {color: theme.colors.onSurfaceVariant}]}>
+              {t("editAccount.Category")}
+            </Text>
+            <View style={styles.categoryGrid}>
+              {CATEGORIES.map((cat) => {
+                const active = category === cat.key;
+                return (
+                  <TouchableOpacity
+                    key={cat.key}
+                    onPress={() => setCategory(active ? null : cat.key)}
+                    activeOpacity={0.85}
+                    style={[
+                      styles.categoryChip,
+                      {
+                        backgroundColor: active ? cat.color : theme.colors.surfaceVariant,
+                      },
+                    ]}
+                  >
+                    <MaterialCommunityIcons
+                      name={cat.icon}
+                      size={14}
+                      color={active ? "#fff" : theme.colors.onSurfaceVariant}
+                    />
+                    <Text style={[styles.categoryChipText, {color: active ? "#fff" : theme.colors.onSurfaceVariant}]}>
+                      {t(`categories.${cat.key}`, cat.label)}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <View style={styles.favoriteRow}>
+              <MaterialCommunityIcons name="star" size={20} color="#facc15" />
+              <Text style={[styles.favoriteLabel, {color: theme.colors.onSurface}]}>
+                {t("editAccount.Pin to top")}
               </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+              <Switch value={isFavorite} onValueChange={setIsFavorite} />
+            </View>
+
+            <TextInput
+              label={t("editAccount.Notes")}
+              value={notes}
+              onChangeText={setNotes}
+              mode="outlined"
+              multiline
+              numberOfLines={3}
+              style={styles.input}
+              outlineStyle={styles.inputOutline}
+            />
+
+            <TextInput
+              label={t("editAccount.Backup / Recovery codes")}
+              value={backupCodes}
+              onChangeText={setBackupCodes}
+              mode="outlined"
+              multiline
+              numberOfLines={4}
+              placeholder={t("editAccount.One code per line")}
+              style={styles.input}
+              outlineStyle={styles.inputOutline}
+            />
+          </View>
+        )}
+      </ScrollView>
 
       <Button
         mode="contained"
@@ -210,7 +324,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
     marginTop: 4,
-    marginBottom: 20,
+    marginBottom: 12,
   },
   typeChip: {
     flex: 1,
@@ -229,8 +343,53 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "500",
   },
+  advancedToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 8,
+    marginBottom: 4,
+  },
+  sectionLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    marginTop: 6,
+    marginBottom: 6,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  categoryGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 12,
+  },
+  categoryChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 14,
+    gap: 4,
+  },
+  categoryChipText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  favoriteRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 8,
+    marginBottom: 4,
+    gap: 8,
+  },
+  favoriteLabel: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: "500",
+  },
   addButton: {
     borderRadius: 22,
+    marginTop: 8,
   },
   addButtonContent: {
     paddingVertical: 6,
