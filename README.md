@@ -1,183 +1,360 @@
 <div align="center">
 
-# Budhori Authenticator
+# Authenticator App
 
-**A modern, cross-platform TOTP authenticator built with React Native & Expo.**
+**Two-factor codes on your phone, kept on your phone, synced only when you want.**
 
-Secure your accounts with time-based one-time passwords (TOTP) — offline-first, private by default, and beautifully simple.
+A cross-platform TOTP authenticator for iOS, Android and the web, built with React Native and Expo. It works fully offline, can sync through a Casdoor account, and ships with a small Node.js API service in the same repository.
 
-![Platforms](https://img.shields.io/badge/platforms-iOS%20%7C%20Android%20%7C%20Web-4c9eff?style=for-the-badge)
-![React Native](https://img.shields.io/badge/React%20Native-0.76-61dafb?style=for-the-badge&logo=react)
-![Expo](https://img.shields.io/badge/Expo-SDK%2052-000020?style=for-the-badge&logo=expo)
-![License](https://img.shields.io/badge/License-Apache%202.0-green?style=for-the-badge)
+![iOS · Android · Web](https://img.shields.io/badge/iOS%20·%20Android%20·%20Web-1f2937?style=flat-square)
+![Expo SDK 52](https://img.shields.io/badge/Expo%20SDK-52-000020?style=flat-square&logo=expo)
+![React Native 0.76](https://img.shields.io/badge/React%20Native-0.76-61dafb?style=flat-square&logo=react&logoColor=white)
+![Node.js + Express](https://img.shields.io/badge/API-Express%204-339933?style=flat-square&logo=node.js&logoColor=white)
+![Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-2ea44f?style=flat-square)
 
 </div>
 
 ---
 
-## ✨ Highlights
+## Contents
 
-- 🔐 **Standards-based 2FA** — full TOTP (RFC 6238) & HOTP support
-- 📱 **Truly cross-platform** — one codebase for iOS, Android, and Web
-- 📷 **One-tap QR scan** — add accounts instantly from any provider
-- 🔄 **Google Authenticator import** — bulk-migrate your entire vault via `otpauth-migration` QR codes
-- 💾 **Offline-first** — all secrets live on-device in encrypted SQLite; no cloud required
-- ☁️ **Optional cloud sync** — pluggable backend for multi-device use
-- 🌍 **12 languages** — English, 中文, 日本語, Français, Deutsch, 한국어, العربية, Español, Русский, Português, ไทย, Українська
-- 🎨 **Modern UI** — clean Material Design 3 look built on React Native Paper
-- ⚡ **Lightning fast** — powered by `@shopify/flash-list` and Expo's new architecture
+- [What's in this repo](#whats-in-this-repo)
+- [Features](#features)
+- [Getting started: mobile app](#getting-started-mobile-app)
+- [Getting started: backend API](#getting-started-backend-api)
+- [API reference](#api-reference)
+- [How the app works](#how-the-app-works)
+- [Project layout](#project-layout)
+- [Builds, releases and CI](#builds-releases-and-ci)
+- [Security notes](#security-notes)
+- [Contributing](#contributing)
+- [License](#license)
 
 ---
 
-## 🚀 Quick Start
+## What's in this repo
+
+| Part                   | Path                    | What it is                                                                        |
+| ---------------------- | ----------------------- | --------------------------------------------------------------------------------- |
+| **Mobile and web app** | `/` (root)              | Expo / React Native authenticator: TOTP codes, QR scanning, imports, Casdoor sync |
+| **Backend API**        | [`backend/`](./backend) | Express + Sequelize REST service with `auth`, `news` and `games` modules          |
+
+The two parts are independent. The app does **not** call the backend; its cloud sync talks directly to a [Casdoor](https://casdoor.org) server.
+
+---
+
+## Features
+
+### Codes
+
+- **TOTP (RFC 6238)** with a live countdown ring that refreshes every 30 seconds
+- **Tap to copy** with clipboard feedback
+
+### Organize
+
+- **Favorites** pinned to the top of the list
+- **Categories**: Banking, Social, Work, Personal, Crypto, Gaming, Shopping, Other, each with its own color and icon
+- **Sort modes**: Smart (usage + recency), Alphabetical, Recently used, Default
+- **Search** by issuer or account name
+- **Notes and backup codes** stored per account, with one-tap copy for each backup code
+- **Usage stats**: how often and how recently each code was used
+
+### Add and import
+
+- **Scan a QR code** with the camera, or pick a QR image from the photo library
+- **Manual entry** of a Base32 secret
+- **Google Authenticator** bulk import via its `otpauth-migration://` export QR
+- **Microsoft Authenticator** import from its exported SQLite database file
+
+### Sync and sign-in
+
+- **Casdoor sync** stores your accounts in your Casdoor user's `mfaAccounts` field
+- **Three ways to sign in**: manual server setup, scan a login QR, or try the public Casdoor demo
+- **Offline-first**: everything works without signing in or without a network
+
+### Experience
+
+- **Light, dark or system theme** (Material Design 3 via React Native Paper)
+- **12 languages**: English, 中文, 日本語, Français, Deutsch, 한국어, العربية, Español, Русский, Português, ไทย, Українська
+
+---
+
+## Getting started: mobile app
+
+### Requirements
+
+- Node.js **18+** (CI uses 20)
+- For Android: Android Studio, the Android SDK, and `ANDROID_HOME` set
+- For iOS: macOS with Xcode and CocoaPods
+
+### Install and run
 
 ```bash
-# 1. Clone & install
 git clone <your-repo-url> budhori-authenticator
 cd budhori-authenticator
 npm install
-
-# 2. Run on your platform of choice
-npm run android   # Android device or emulator
-npm run ios       # iOS simulator
-npm run web       # Browser
 ```
 
-> **Note:** This project uses a **development build** (via `expo-dev-client`). The first run on a device requires `npx expo prebuild` and a native build. See [Building from source](#-building-from-source) below.
+| Command              | What it does                                       |
+| -------------------- | -------------------------------------------------- |
+| `npm start`          | Start the Expo dev server                          |
+| `npm run android`    | Build and run a dev client on a device or emulator |
+| `npm run ios`        | Build and run a dev client in the iOS simulator    |
+| `npm run web`        | Run the web version in your browser                |
+| `npm run export:web` | Produce a static web build in `dist/`              |
 
----
+> This project uses `expo-dev-client`, so Expo Go is not enough. The first `npm run android` or `npm run ios` compiles the native project, which takes a few minutes.
 
-## 📦 Tech Stack
+### Database migrations
 
-| Layer | Choice |
-|---|---|
-| **Framework** | React Native `0.76` + Expo SDK `52` |
-| **Navigation** | React Navigation v6 (stack + bottom tabs) |
-| **UI kit** | React Native Paper (Material Design 3) |
-| **State** | Zustand + AsyncStorage persistence |
-| **Database** | SQLite (via `expo-sqlite`) with Drizzle ORM |
-| **i18n** | i18next + react-i18next (12 locales, RTL support) |
-| **Crypto** | `totp-generator`, `hi-base32`, `expo-crypto` |
-| **QR / Camera** | `expo-camera` + `protobufjs` for Google Auth migration format |
-| **Lists** | `@shopify/flash-list` for buttery-smooth scrolling |
-
----
-
-## 🛠️ Building from Source
-
-### Prerequisites
-
-- **Node.js** `≥ 18`
-- **Android**: Android Studio + SDK, `ANDROID_HOME` env var, a connected device or emulator
-- **iOS**: macOS with Xcode + CocoaPods
-
-### Common setup
+The app's local database is SQLite, managed by Drizzle ORM. Migrations in [`drizzle/`](./drizzle) run automatically on startup. After changing [`db/schema.js`](./db/schema.js), generate a new migration with:
 
 ```bash
-git clone <your-repo-url> budhori-authenticator
-cd budhori-authenticator
-npm install
+npx drizzle-kit generate
 ```
 
-### 🤖 Android build
+---
+
+## Getting started: backend API
+
+The backend lives in [`backend/`](./backend) and has its own `package.json`.
+
+```bash
+cd backend
+npm install
+cp .env.example .env     # then edit the values
+npm run dev              # nodemon, auto-restart on change
+# or
+npm start                # plain node
+```
+
+The server starts on `http://localhost:5000` by default.
+
+### Environment variables
+
+| Variable                                   | Default                        | Notes                                                                   |
+| ------------------------------------------ | ------------------------------ | ----------------------------------------------------------------------- |
+| `PORT`                                     | `5000`                         | HTTP port                                                               |
+| `NODE_ENV`                                 | `development`                  | In `development`, tables are auto-altered to match the models           |
+| `JWT_SECRET`                               | `change-me-in-env`             | **Set a long random string in every real environment**                  |
+| `JWT_EXPIRES_IN`                           | `7d`                           | Token lifetime                                                          |
+| `DB_DIALECT`                               | `mysql`                        | `mysql`, `postgres` or `sqlite` (drivers for these three are installed) |
+| `DB_HOST` / `DB_PORT`                      | `localhost` / `3306`           | Ignored for SQLite                                                      |
+| `DB_NAME` / `DB_USER` / `DB_PASSWORD`      | `app_db` / `root` / empty      | Ignored for SQLite                                                      |
+| `DB_STORAGE`                               | `./data/dev.sqlite`            | SQLite file path, SQLite only                                           |
+| `DB_LOGGING`                               | `false`                        | `true` prints every SQL query                                           |
+| `DB_POOL_MAX` / `MIN` / `IDLE` / `ACQUIRE` | `10` / `0` / `10000` / `30000` | Connection pool tuning                                                  |
+
+**Quickest local setup:** set `DB_DIALECT=sqlite` and you don't need a database server at all.
+
+---
+
+## API reference
+
+Base URL: `http://localhost:5000/api/v1`
+
+Routes marked 🔒 need a header of the form `Authorization: Bearer <token>`, using the token returned by `/auth/login`.
+
+### Health
+
+| Method | Path      | Description       |
+| ------ | --------- | ----------------- |
+| `GET`  | `/health` | Status and uptime |
+
+### Auth
+
+| Method | Path             | Body                        | Description            |
+| ------ | ---------------- | --------------------------- | ---------------------- |
+| `POST` | `/auth/register` | `name`, `email`, `password` | Create a user          |
+| `POST` | `/auth/login`    | `email`, `password`         | Returns a JWT          |
+| `GET`  | `/auth/me` 🔒    |                             | Current user's profile |
+
+### News
+
+| Method   | Path           | Description                                      |
+| -------- | -------------- | ------------------------------------------------ |
+| `GET`    | `/news`        | List articles                                    |
+| `GET`    | `/news/:id`    | Get one article                                  |
+| `POST`   | `/news` 🔒     | Create an article (`title`, `content`, `author`) |
+| `PUT`    | `/news/:id` 🔒 | Update an article                                |
+| `DELETE` | `/news/:id` 🔒 | Delete an article                                |
+
+### Games
+
+| Method | Path                     | Description                                     |
+| ------ | ------------------------ | ----------------------------------------------- |
+| `GET`  | `/games`                 | List games                                      |
+| `GET`  | `/games/:id`             | Get one game                                    |
+| `POST` | `/games` 🔒              | Create a game (`name`, `genre`)                 |
+| `POST` | `/games/:id/scores` 🔒   | Submit a score (`score`) for the signed-in user |
+| `GET`  | `/games/:id/leaderboard` | Top 10 scores for a game                        |
+
+### Response shape
+
+Every response uses the same envelope:
+
+```json
+{
+  "statusCode": 200,
+  "data": {},
+  "message": "Login successful",
+  "success": true
+}
+```
+
+### Example
+
+```bash
+# Register, then log in and use the token
+curl -X POST localhost:5000/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Ada","email":"ada@example.com","password":"s3cret"}'
+
+TOKEN=$(curl -s -X POST localhost:5000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"ada@example.com","password":"s3cret"}' | jq -r '.data.token')
+
+curl localhost:5000/api/v1/auth/me -H "Authorization: Bearer $TOKEN"
+```
+
+---
+
+## How the app works
+
+### Local storage
+
+Each account is a row in the on-device SQLite table `accounts`:
+
+| Column                                          | Purpose                                         |
+| ----------------------------------------------- | ----------------------------------------------- |
+| `account_name`, `issuer`                        | Identity (unique together)                      |
+| `secret`                                        | Base32 TOTP secret                              |
+| `is_favorite`, `category`                       | Organization                                    |
+| `notes`, `backup_codes`                         | Free text and newline-separated recovery codes  |
+| `usage_count`, `last_used_at`                   | Feed the Smart sort                             |
+| `changed_at`, `sync_at`, `deleted_at`, `origin` | Sync bookkeeping; deletes are soft until synced |
+
+Settings and the signed-in session are kept in AsyncStorage through Zustand.
+
+### Casdoor sync
+
+1. Sign in from **Settings**. The default config points at the public demo, `https://door.casdoor.com` (see [`src/DefaultCasdoorSdkConfig.js`](./src/DefaultCasdoorSdkConfig.js)).
+2. The app reads your user's `mfaAccounts` from `/api/get-user`, merges them with local changes using the timestamps above, and writes the result back with `/api/update-user`.
+3. Each install gets a random `origin` ID, so the app can tell which device made a change.
+
+**QR login** expects a code in this format:
+
+```
+casdoor-authenticator://login?serverUrl=<url>&accessToken=<token>
+```
+
+You can scan it or paste it from the clipboard.
+
+---
+
+## Project layout
+
+```
+.
+├── src/                        App source
+│   ├── App.js                  Root: migrations, fonts, theme, navigation
+│   ├── NavigationBar.js        Stack: Home → Item detail, Settings
+│   ├── HomePage.js             Account list, filters, sort sheet, FAB
+│   ├── ItemDetailPage.js       Code, stats, notes, backup codes
+│   ├── EnterAccountDetails.js  Manual add
+│   ├── EditAccountDetails.js   Edit, category, notes, backup codes
+│   ├── ScanQRCode.js           QR scan + Google Authenticator migration
+│   ├── ImportManager.js        Import sheet (Google / Microsoft)
+│   ├── MSAuthImportLogic.js    Microsoft Authenticator DB reader
+│   ├── CasdoorLoginPage.js     Casdoor sign-in flow
+│   ├── LoginMethodSelector.js  Manual / QR / demo picker
+│   ├── ScanLogin.js            Login-QR parser
+│   ├── syncLogic.js            Merge + push/pull with Casdoor
+│   ├── api.js                  Casdoor HTTP client
+│   ├── useAccountStore.js      Accounts, categories, sort logic
+│   ├── totpUtil.js             Code generation + countdown
+│   └── theme.js                Light / dark Material themes
+├── db/                         Drizzle schema + SQLite client
+├── drizzle/                    Generated migrations
+├── google/                     Protobuf schema for Google Authenticator export
+├── locales/                    12 translation bundles
+├── assets/                     Icon, splash, favicon
+├── android/  ios/              Native projects
+├── backend/                    Express API (see above)
+│   ├── modules/{auth,news,game}/   routes · controller · service · model
+│   ├── middlewares/            JWT auth, logger, error handler
+│   ├── db/  config/  utils/
+│   └── index.js                Entry point
+├── app.json                    Expo config (bundle ID com.budhori.authenticator)
+└── eas.json                    EAS build profiles
+```
+
+---
+
+## Builds, releases and CI
+
+### Local release builds
+
+**Android APK**
 
 ```bash
 npx expo prebuild --platform android
 cd android && ./gradlew assembleRelease
+# → android/app/build/outputs/apk/release/app-release.apk
 ```
 
-The signed APK will be at `android/app/build/outputs/apk/release/app-release.apk`.
-
-For a debug build during development:
-
-```bash
-npm run android
-```
-
-### 🍏 iOS build
+**iOS**
 
 ```bash
 npx expo prebuild --platform ios
 cd ios && pod install
-npm run ios
+# open ios/*.xcworkspace in Xcode and archive
 ```
 
-### 🌐 Web build
+**Web**
 
 ```bash
-npm run export:web
+npm run export:web    # → dist/
 ```
 
-Output is written to `dist/` — deploy to any static host.
+### EAS profiles
 
----
+[`eas.json`](./eas.json) defines `development`, `preview` and `production` profiles. Android builds produce an APK; iOS preview builds target the simulator.
 
-## 📱 Usage
-
-1. **Add an account** — tap the **+** button and either:
-   - Scan a QR code from any TOTP-enabled service (Google, GitHub, AWS, etc.)
-   - Enter the secret key manually
-   - Import from Google Authenticator (`Export accounts` → scan the migration QR)
-2. **Generate codes** — TOTP codes refresh every 30 seconds with a visual countdown timer.
-3. **Manage entries** — swipe or long-press any account to edit, rename, or delete.
-4. **Sync (optional)** — sign in through the settings screen to back up encrypted entries to your backend.
-
----
-
-## 📁 Project Structure
-
-```
-budhori-authenticator/
-├── src/                   # All application source (screens, hooks, utils)
-│   ├── App.js             # Root component
-│   ├── HomePage.js        # Account list & TOTP display
-│   ├── ScanQRCode.js      # QR scanner + Google Auth migration
-│   ├── SettingPage.js     # Preferences & language picker
-│   ├── syncLogic.js       # Cloud sync engine
-│   ├── totpUtil.js        # TOTP generation helpers
-│   └── ...
-├── db/                    # Drizzle schema + client
-├── drizzle/               # Generated SQL migrations
-├── google/                # Protobuf schema for Google Auth import
-├── locales/               # 12 language JSON bundles
-├── assets/                # Icons, splash, fonts
-├── android/ · ios/        # Native projects (generated by prebuild)
-├── index.js               # Entry point → registers src/App
-├── app.json               # Expo config
-└── drizzle.config.js      # Drizzle CLI config
+```bash
+eas build --profile preview --platform android
 ```
 
----
+### GitHub Actions
 
-## 🔒 Security & Privacy
+| Workflow         | Trigger                               | What it does                                         |
+| ---------------- | ------------------------------------- | ---------------------------------------------------- |
+| `release.yml`    | Push or PR to `master`, or manual run | Builds the Android APK and runs semantic-release     |
+| `deploy-web.yml` | Push to `master`, or manual run       | Exports the web build and deploys it to GitHub Pages |
+| `preview.yml`    | A `/preview` comment on a PR          | Publishes an EAS Update to a `pr-<branch>` channel   |
 
-- **Secrets never leave your device** unless you explicitly enable cloud sync.
-- All account data is stored in the app's private sandbox using SQLite.
-- No telemetry, no analytics, no tracking.
-- TOTP secrets are stored as Base32-encoded strings, following [RFC 4648](https://datatracker.ietf.org/doc/html/rfc4648).
-
----
-
-## 🤝 Contributing
-
-Pull requests are welcome! For major changes, please open an issue first to discuss what you'd like to change.
-
-1. Fork the repo
-2. Create a feature branch (`git checkout -b feature/amazing-thing`)
-3. Commit your changes (`git commit -am 'Add amazing thing'`)
-4. Push to the branch (`git push origin feature/amazing-thing`)
-5. Open a Pull Request
+Versioning follows [semantic-release](https://semantic-release.gitbook.io), so commit messages should use the Conventional Commits format (`feat:`, `fix:`, `chore:` …).
 
 ---
 
-## 📄 License
+## Security notes
 
-Distributed under the **Apache License 2.0**. See [LICENSE](./LICENSE) for full text.
+- Secrets stay on the device unless you sign in and sync.
+- The local SQLite database lives in the app's private sandbox but is **not encrypted at rest**.
+- When you sync, secrets are sent to your Casdoor server and stored in your user record. Only use a server you trust.
+- For the backend: always set `JWT_SECRET`, and run with `NODE_ENV=production` so the schema is not auto-altered.
 
 ---
 
-<div align="center">
+## Contributing
 
-**Built with ❤️ using React Native & Expo**
+1. Fork the repo and create a branch: `git checkout -b feat/short-description`
+2. Make your change and run `npx eslint src` before committing
+3. Use a Conventional Commit message, for example `feat: add HOTP support`
+4. Open a pull request. Maintainers can comment `/preview` to get a test build.
 
-</div>
+---
+
+## License
+
+[Apache License 2.0](./LICENSE). Originally based on the Casdoor Authenticator.
